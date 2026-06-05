@@ -11,6 +11,9 @@ export interface DocumentInfo {
   name: string;
   uploadedAt: string;
   size?: string;
+  sizeBefore?: string;
+  isCompressed?: boolean;
+  compressionSavings?: number;
 }
 
 export interface LksDocuments {
@@ -87,6 +90,7 @@ export interface DinsosSettings {
   nipOfDinsos: string;
   appLogo: string;
   managementProfile: string;
+  googleDriveRoot?: string;
 }
 
 export interface DistrictCoord {

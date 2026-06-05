@@ -4,7 +4,8 @@ export const INITIAL_SETTINGS: DinsosSettings = {
   headOfDinsos: "Drs. H. Lulus Suprasetyawan, M.Si",
   nipOfDinsos: "19691125 199303 1 005",
   appLogo: "https://images.unsplash.com/photo-1599305445671-ac291c95aba9?w=150&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-  managementProfile: "Dinas Sosial, Pemberdayaan Perempuan dan Perlindungan Anak (Dinsos PPPA) Kabupaten Blora memiliki tugas membantu Bupati dalam melaksanakan urusan pemerintahan bidang sosial dan bidang pemberdayaan perempuan dan perlindungan anak yang menjadi kewenangan Daerah."
+  managementProfile: "Dinas Sosial, Pemberdayaan Perempuan dan Perlindungan Anak (Dinsos PPPA) Kabupaten Blora memiliki tugas membantu Bupati dalam melaksanakan urusan pemerintahan bidang sosial dan bidang pemberdayaan perempuan dan perlindungan anak yang menjadi kewenangan Daerah.",
+  googleDriveRoot: "SILKS"
 };
 
 export const INITIAL_LKS_DATA: LKS[] = [
@@ -131,65 +132,4 @@ export const INITIAL_LKS_DATA: LKS[] = [
   }
 ];
 
-export const INITIAL_BENEFICIARIES: Beneficiary[] = [
-  {
-    id: "pm-1",
-    name: "Budi Santoso",
-    lksId: "lks-bhakti-mulia",
-    lksName: "LKS Bhakti Mulia",
-    nik: "3316011212850001",
-    kk: "3316010505120005",
-    birthPlace: "Blora",
-    birthDate: "1985-12-12",
-    gender: "L",
-    district: "Blora",
-    village: "Tempelan",
-    category: "Dalam",
-    notes: "Penyandang disabilitas fisik paraplegia berat. Membutuhkan kursi roda adaptif dan paket sembako rutin."
-  },
-  {
-    id: "pm-2",
-    name: "Siti Aminah",
-    lksId: "lks-bhakti-mulia",
-    lksName: "LKS Bhakti Mulia",
-    nik: "3316015508920002",
-    kk: "3316010505120005",
-    birthPlace: "Blora",
-    birthDate: "1992-08-15",
-    gender: "P",
-    district: "Blora",
-    village: "Mlangsen",
-    category: "Dalam",
-    notes: "Anak yatim piatu berprestasi. Diusulkan menerima Program Keluarga Harapan (PKH) dan Beasiswa Anak Asuh."
-  },
-  {
-    id: "pm-3",
-    name: "Rinto Wijaya",
-    lksId: "lks-manunggal-kasih",
-    lksName: "LKS Manunggal Kasih",
-    nik: "3316022204780003",
-    kk: "3316021111150009",
-    birthPlace: "Cepu",
-    birthDate: "1978-04-22",
-    gender: "L",
-    district: "Cepu",
-    village: "Balun",
-    category: "Dalam",
-    notes: "Lansia terlantar tanpa sanak saudara. Mengikuti program panti jompo harian LKS Manunggal Kasih."
-  },
-  {
-    id: "pm-4",
-    name: "Dewi Lestari",
-    lksId: "lks-manunggal-kasih",
-    lksName: "LKS Manunggal Kasih",
-    nik: "3316026010020004",
-    kk: "3316021111150009",
-    birthPlace: "Bojonegoro",
-    birthDate: "2002-10-20",
-    gender: "P",
-    district: "Cepu",
-    village: "Tambakromo",
-    category: "Luar",
-    notes: "Korban kekerasan rumah tangga (asal Bojonegoro, domisili perlindungan di Cepu). Mengikuti pemulihan psikologis trauma healing."
-  }
-];
+export const INITIAL_BENEFICIARIES: Beneficiary[] = [];

@@ -74,12 +74,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   } | null>(null);
 
   const showToast = (type: "success" | "error" | "info" | "warn", title: string, message: string) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setToasts(prev => [...prev, { id, type, title, message }]);
+    // Popup notifications are disabled by user request
   };
 
   const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    // disabled
   };
 
   const addNewPeerNotification = (user: string, action: string) => {
@@ -125,43 +124,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     >
       {children}
 
-      {/* Render Toast Notifications */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 w-full max-w-sm pointer-events-none">
-        <AnimatePresence>
-          {toasts.map(toast => {
-            const isSuccess = toast.type === "success";
-            const isError = toast.type === "error";
-            const isWarn = toast.type === "warn";
-
-            return (
-              <motion.div
-                key={toast.id}
-                initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="pointer-events-auto bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-xl border border-slate-700/50 p-4 flex gap-3.5"
-              >
-                <div className="flex-shrink-0 mt-0.5">
-                  {isSuccess && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
-                  {isError && <AlertTriangle className="w-5 h-5 text-rose-400" />}
-                  {isWarn && <AlertTriangle className="w-5 h-5 text-amber-400" />}
-                  {!isSuccess && !isError && !isWarn && <Bell className="w-5 h-5 text-sky-400" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-100">{toast.title}</p>
-                  <p className="text-xs text-slate-300 mt-1">{toast.message}</p>
-                </div>
-                <button
-                  onClick={() => removeToast(toast.id)}
-                  className="flex-shrink-0 text-slate-400 hover:text-white transition-colors h-fit self-start"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
+      {/* Render Toast Notifications is disabled by user request */}
 
       {/* Action Confirmation Modal */}
       <AnimatePresence>

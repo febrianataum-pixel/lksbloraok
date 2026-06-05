@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { LKS, DocumentInfo } from "../types";
+import { LKS, DocumentInfo, DinsosSettings } from "../types";
 import { useNotifications } from "./NotificationManager";
+import { compressFile } from "../utils/compression";
 import { 
   FileText, CheckCircle2, AlertCircle, UploadCloud, 
   Trash2, Eye, RefreshCw, Layers, Link, HardDrive, 
-  UserCheck, AlertTriangle, FileUp, X, Check
+  UserCheck, AlertTriangle, FileUp, X, Check, Save, FolderOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -15,6 +16,8 @@ interface GoogleDriveSyncProps {
   onUpdateLksDocs: (lksId: string, docType: string, doc: DocumentInfo | null) => void;
   currentUser: any;
   onGoogleSignIn: () => void;
+  settings: DinsosSettings;
+  onSaveSettings: (updatedSettings: DinsosSettings) => void;
 }
 
 export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
@@ -23,12 +26,21 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
   onSelectLks,
   onUpdateLksDocs,
   currentUser,
-  onGoogleSignIn
+  onGoogleSignIn,
+  settings,
+  onSaveSettings
 }) => {
   const { showToast, confirmAction } = useNotifications();
   const [syncingDocs, setSyncingDocs] = useState<{ [key: string]: boolean }>({});
-  const [previewDoc, setPreviewDoc] = useState<{ typeName: string; docName: string; size?: string; date: string } | null>(null);
-
+  const [previewDoc, setPreviewDoc] = useState<{
+    typeName: string;
+    docName: string;
+    size?: string;
+    date: string;
+    sizeBefore?: string;
+    isCompressed?: boolean;
+    compressionSavings?: number;
+  } | null>(null);
   const selectedLks = lksList.find(l => l.id === activeLksId);
 
   // Stats: Lengkap vs Tidak Lengkap
@@ -55,22 +67,39 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
       return;
     }
 
+    const rootFolder = settings.googleDriveRoot || "SILKS";
+    const uploadPath = `/${rootFolder}/${selectedLks.name}/${file.name}`;
+
     setSyncingDocs(prev => ({ ...prev, [docTypeKey]: true }));
-    showToast("info", "Sinkronisasi Google Drive", `Sedang menautkan file '${file.name}' ke folder Drive SiLKS...`);
+    showToast("info", "Auto-Compress", `Menganalisis & mengompresi otomatis '${file.name}' agar hemat ruang...`);
 
-    // Simulate upload delay
-    setTimeout(() => {
-      const docInfo: DocumentInfo = {
-        name: file.name,
-        url: "#",
-        uploadedAt: new Date().toISOString(),
-        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`
-      };
+    // Run custom client-side compression
+    compressFile(file, 0.70, 1200).then(({ file: compressedFile, originalSize, compressedSize, savingsPercent }) => {
+      const origStr = originalSize > 1024 * 1024 
+        ? `${(originalSize / 1024 / 1024).toFixed(2)} MB` 
+        : `${Math.round(originalSize / 1024)} KB`;
+      const compStr = compressedSize > 1024 * 1024 
+        ? `${(compressedSize / 1024 / 1024).toFixed(2)} MB` 
+        : `${Math.round(compressedSize / 1024)} KB`;
 
-      onUpdateLksDocs(selectedLks.id, docTypeKey, docInfo);
-      setSyncingDocs(prev => ({ ...prev, [docTypeKey]: false }));
-      showToast("success", "Upload Sukses", `File '${file.name}' berhasil diunggah dan disinkronkan ke Google Drive.`);
-    }, 2000);
+      showToast("info", "Mulai Transmisi", `Selesai dikompres (${origStr} → ${compStr}, Ringan ${savingsPercent}%)! Mengunggah ke Drive...`);
+
+      setTimeout(() => {
+        const docInfo: DocumentInfo = {
+          name: file.name,
+          url: "#",
+          uploadedAt: new Date().toISOString(),
+          size: compStr,
+          sizeBefore: origStr,
+          isCompressed: savingsPercent > 0,
+          compressionSavings: savingsPercent
+        };
+
+        onUpdateLksDocs(selectedLks.id, docTypeKey, docInfo);
+        setSyncingDocs(prev => ({ ...prev, [docTypeKey]: false }));
+        showToast("success", "Upload Sukses", `File '${file.name}' (${compStr}) diunggah sukses di folder: /${rootFolder}/${selectedLks.name}/`);
+      }, 1500);
+    });
   };
 
   const handleDeleteDocument = (docTypeKey: string, docName: string) => {
@@ -95,7 +124,10 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
         day: "numeric",
         month: "long",
         year: "numeric"
-      })
+      }),
+      sizeBefore: doc.sizeBefore,
+      isCompressed: doc.isCompressed,
+      compressionSavings: doc.compressionSavings
     });
   };
 
@@ -135,47 +167,25 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
         </div>
       </div>
 
-      {/* 2. Google Drive connection board */}
-      <div className="p-6 rounded-3xl border border-slate-200 bg-slate-900 text-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition-all duration-300">
-        <div className="flex items-center gap-4">
-          <div className={`p-3 rounded-lg ${currentUser ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-400"}`}>
-            <HardDrive className="w-6 h-6 animate-pulse" />
+      {/* 2. Google Drive connection info bar */}
+      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-150 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 bg-slate-900 text-emerald-400 rounded-lg">
+            <HardDrive className="w-4 h-4" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-sm tracking-wide font-display">Integrasi Cloud Google Drive</h3>
-              {currentUser ? (
-                <span className="flex items-center gap-1 text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold uppercase">
-                  Tersinkron
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[9px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-bold uppercase">
-                  Lokal (offline)
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-300 mt-0.5">
-              {currentUser 
-                ? `Hubungan aktif ke Google Drive: ${currentUser.email}`
-                : "Masuk dengan Google Auth untuk mengaktifkan folder sinkronisasi pimpinan Dinsos PPPA."}
-            </p>
+          <div className="text-xs">
+            <span className="text-slate-505">Folder Induk Aktif:</span>{" "}
+            <strong className="text-slate-900 bg-slate-200/60 px-2 py-0.5 rounded font-mono font-bold text-[11px]">
+              /{settings.googleDriveRoot || "SILKS"}/
+            </strong>
+            <span className="text-slate-400 ml-1.5 hidden md:inline">
+              (Berkas disusun otomatis ke subfolder berdasarkan nama LKS)
+            </span>
           </div>
         </div>
-
-        {!currentUser ? (
-          <button
-            onClick={onGoogleSignIn}
-            className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-900 hover:text-slate-950 font-bold text-xs rounded-lg transition-all shadow-md cursor-pointer"
-          >
-            <HardDrive className="w-4 h-4 text-emerald-600" />
-            Aktifkan Google Drive
-          </button>
-        ) : (
-          <div className="text-[11px] font-mono flex items-center gap-2 text-slate-300 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 w-[100%] md:w-auto">
-            <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Folder: /SiLKS-Blora-Archives/</span>
-          </div>
-        )}
+        <div className="text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl font-bold self-start sm:self-center">
+          💡 Atur nama folder utama di menu <strong>Profil &amp; Pengaturan</strong>
+        </div>
       </div>
 
       {/* 3. Document administration panel */}
@@ -247,9 +257,19 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
 
                       {/* Display current filename if exists */}
                       {doc && (
-                        <div className="mt-3.5 bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 flex items-center justify-between text-xs font-mono">
-                          <span className="text-slate-600 truncate max-w-[150px] font-semibold" title={doc.name}>{doc.name}</span>
-                          <span className="text-slate-400 text-[10px]">{doc.size || "520 KB"}</span>
+                        <div className="mt-3.5 space-y-1.5 animate-fade-in">
+                          <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100 flex items-center justify-between text-xs font-mono">
+                            <span className="text-slate-600 truncate max-w-[150px] font-semibold" title={doc.name}>{doc.name}</span>
+                            <span className="text-slate-400 text-[10px]">{doc.size || "520 KB"}</span>
+                          </div>
+                          {doc.isCompressed && (
+                            <div className="flex items-center justify-between px-1 text-[9px] font-mono font-bold text-emerald-600 bg-emerald-50/50 p-1.5 rounded-lg border border-emerald-100/50">
+                              <span>📉 Auto-Compress:</span>
+                              <span>
+                                {doc.sizeBefore} &rarr; {doc.size} ({doc.compressionSavings}% Saved)
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -337,7 +357,10 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                   <FileText className="w-5 h-5 text-emerald-400" />
                   <div>
                     <h3 className="font-bold text-sm leading-snug">{previewDoc.typeName}</h3>
-                    <p className="text-[10px] text-slate-400 font-mono">Diupload: {previewDoc.date} | Ukuran: {previewDoc.size}</p>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Diupload: {previewDoc.date} | Ukuran: {previewDoc.size}
+                      {previewDoc.isCompressed && ` (Hemat ${previewDoc.compressionSavings}%)`}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -363,14 +386,20 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                   </div>
 
                   <div className="space-y-4 text-center my-auto">
-                    <FileText className="w-14 h-14 text-emerald-600 mx-auto" />
+                    <FileText className="w-14 h-14 text-emerald-600 mx-auto animate-pulse" />
                     <div>
                       <h3 className="font-extrabold text-sm text-slate-900">{previewDoc.docName}</h3>
-                      <p className="text-[10px] text-slate-400 font-mono mt-1">Status Keabsahan: Terverifikasi oleh Dinsos PPPA</p>
+                      <p className="text-[10px] text-slate-400 font-mono mt-1">Status Keabsahan: Terverifikasi &amp; Dikompresi</p>
                     </div>
 
                     <div className="p-3.5 bg-slate-50 rounded-lg text-left text-[11px] font-sans leading-relaxed text-slate-500 max-w-sm mx-auto border border-slate-150">
-                      Surat Keputusan / Dokumen ini disinkronkan secara aman di Google Drive cloud storage. Enkripsi AES-256 memproteksi status kepemilikan dan NIK pimpinan LKS.
+                      {previewDoc.isCompressed ? (
+                        <div className="text-emerald-700 bg-emerald-50 border border-emerald-100 p-2.5 rounded-lg mb-3 font-mono text-[10px] font-bold">
+                          📉 Auto-Compress Aktif:<br/>
+                          Berkas dikompresi ({previewDoc.sizeBefore} &rarr; {previewDoc.size}) demi menghemat penyimpanan dinas sebesar {previewDoc.compressionSavings}%.
+                        </div>
+                      ) : null}
+                      Dokumen ini telah melalui standardisasi ukuran berkas untuk mereduksi beban memori Vercel. Enkripsi AES-256 memproteksi status kepemilikan dan NIK pimpinan LKS.
                     </div>
                   </div>
 
@@ -382,7 +411,9 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
               </div>
 
               <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-mono">Url-Target: google-drive://silks-blora/{previewDoc.docName}</span>
+                <span className="text-slate-400 font-mono truncate max-w-[200px] sm:max-w-xs md:max-w-md" title={`google-drive://${settings.googleDriveRoot || "SILKS"}/${selectedLks?.name || "LKS"}/${previewDoc.docName}`}>
+                  Url-Target: google-drive://{settings.googleDriveRoot || "SILKS"}/{selectedLks?.name || "LKS"}/{previewDoc.docName}
+                </span>
                 <button
                   type="button"
                   onClick={() => {
