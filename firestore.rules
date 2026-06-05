@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net (default deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core validation helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Rules for LKS (Lembaga Kesejahteraan Sosial)
+    match /lks/{lksId} {
+      // Allow read to authenticated users
+      allow read: if isSignedIn();
+      // Allow create if signed in and valid id
+      allow create: if isSignedIn() && isValidId(lksId) && request.resource.data.name is string;
+      // Allow update/delete if signed in
+      allow update, delete: if isSignedIn() && isValidId(lksId);
+    }
+
+    // Rules for beneficiaries (Penerima Manfaat)
+    match /beneficiaries/{beneficiaryId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(beneficiaryId) && request.resource.data.name is string;
+      allow update, delete: if isSignedIn() && isValidId(beneficiaryId);
+    }
+
+    // Rules for settings
+    match /settings/{settingId} {
+      allow read: if isSignedIn() || true; // Public or auth users can read banner or general settings
+      allow write: if isSignedIn() && isValidId(settingId);
+    }
+  }
+}

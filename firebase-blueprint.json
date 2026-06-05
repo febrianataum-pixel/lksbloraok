@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "LKS": {
+      "title": "LKS",
+      "description": "Lembaga Kesejahteraan Sosial (Social Welfare Institution) in Blora",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "district": { "type": "string" },
+        "village": { "type": "string" },
+        "address": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "establishedDate": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "chairman": { "type": "string" },
+        "secretary": { "type": "string" },
+        "treasurer": { "type": "string" },
+        "kemenkumhamNo": { "type": "string" },
+        "npwp": { "type": "string" },
+        "stdNo": { "type": "string" },
+        "stdExpiryDate": { "type": "string" },
+        "position": { "type": "string" },
+        "workScope": { "type": "string" },
+        "accreditation": { "type": "string" },
+        "accreditationYear": { "type": "string" },
+        "activityDescription": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "supportHistory": { "type": "array" },
+        "documents": { "type": "object" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "district", "village", "chairman", "isActive"]
+    },
+    "Beneficiary": {
+      "title": "Beneficiary",
+      "description": "Penerima Manfaat (Beneficiary) registered under an LKS",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "lksId": { "type": "string" },
+        "lksName": { "type": "string" },
+        "nik": { "type": "string" },
+        "kk": { "type": "string" },
+        "birthPlace": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "gender": { "type": "string" },
+        "district": { "type": "string" },
+        "village": { "type": "string" },
+        "category": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "lksId", "nik", "gender", "category"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application configuration for SiLKS Blora",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "headOfDinsos": { "type": "string" },
+        "nipOfDinsos": { "type": "string" },
+        "appLogo": { "type": "string" },
+        "managementProfile": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["headOfDinsos", "nipOfDinsos"]
+    }
+  },
+  "firestore": {
+    "/lks/{lksId}": {
+      "schema": "LKS",
+      "description": "Registered social welfare institutions in Blora"
+    },
+    "/beneficiaries/{beneficiaryId}": {
+      "schema": "Beneficiary",
+      "description": "Welfare recipients linked to specific LKS institutions"
+    },
+    "/settings/{settingId}": {
+      "schema": "Settings",
+      "description": "Dynamic general configuration settings like leadership and agency info"
+    }
+  }
+}
