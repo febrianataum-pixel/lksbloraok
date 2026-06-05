@@ -231,7 +231,7 @@ function SiLksBloraApp() {
   const handleDeleteLks = (id: string, name: string) => {
     confirmAction({
       title: "Hapus Lembaga LKS?",
-      message: `Apakah Anda yakin ingin menghapus '${name}' dari pendaftaran? Semua data penerima manfaat dan file lampiran terkait akan terlepas.`,
+      message: `Apakah Anda yakin ingin menghapus '${name}' dari pendaftaran? Semua data Penerima Manfaat (PM) yang berada di bawah LKS ini juga akan otomatis dihapus secara permanen.`,
       onConfirm: async () => {
         // Edit states
         setLksList(prev => prev.filter(l => l.id !== id));
@@ -253,7 +253,7 @@ function SiLksBloraApp() {
             handleFirestoreError(error, OperationType.DELETE, `lks/${id}`);
           }
         }
-        showToast("success", "LKS Dihapus", `LKS '${name}' beserta rincian penerima manfaat dilepas dari database.`);
+        showToast("success", "LKS & PM Berhasil Dihapus", `LKS '${name}' beserta seluruh data Penerima Manfaat (PM) di bawahnya telah dihapus secara otomatis.`);
       }
     });
   };
