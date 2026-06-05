@@ -139,6 +139,7 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                     <table className="w-full text-xs text-left border-collapse">
                       <tbody>
                         <tr className="border-b border-slate-100"><td className="py-1.5 font-semibold w-1/3 text-slate-500">No SK Kemenkumham</td><td className="py-1.5 text-slate-800 font-mono">{targetLks.kemenkumhamNo || "-"}</td></tr>
+                        <tr className="border-b border-slate-100"><td className="py-1.5 font-semibold text-slate-500">Nama Sesuai SK Kemenkumham</td><td className="py-1.5 text-slate-800">{targetLks.kemenkumhamName || "-"}</td></tr>
                         <tr className="border-b border-slate-100"><td className="py-1.5 font-semibold text-slate-500">NPWP Pajak</td><td className="py-1.5 text-slate-800 font-mono">{targetLks.npwp || "-"}</td></tr>
                         <tr className="border-b border-slate-100"><td className="py-1.5 font-semibold text-slate-500">No. Surat Tanda Daftar (STD)</td><td className="py-1.5 text-slate-800 font-mono">{targetLks.stdNo || "-"}</td></tr>
                         <tr className="border-b border-slate-100"><td className="py-1.5 font-semibold text-slate-500">Masa Berlaku STD s/d</td><td className="py-1.5 text-slate-800 font-mono">{targetLks.stdExpiryDate || "-"}</td></tr>
@@ -251,8 +252,11 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
 
                   <div className="pl-6 space-y-1.5 font-bold text-slate-800 my-4 bg-slate-50 p-4 border border-slate-200 rounded-lg">
                     <div className="grid grid-cols-4"><span className="text-slate-500 font-medium">Nama LKS</span><span className="col-span-3">: {targetLks.name}</span></div>
-                    <div className="grid grid-cols-4"><span className="text-slate-500 font-medium font-semibold">Nama Ketua</span><span className="col-span-3">: {targetLks.chairman}</span></div>
+                    <div className="grid grid-cols-4"><span className="text-slate-500 font-medium font-semibold">Nama Ketua</span><span className="col-span-3 font-semibold">: {targetLks.chairman}</span></div>
                     <div className="grid grid-cols-4"><span className="text-slate-500 font-medium">SK Kemenkumham</span><span className="col-span-3 font-mono">: {targetLks.kemenkumhamNo || "-"}</span></div>
+                    {targetLks.kemenkumhamName && (
+                      <div className="grid grid-cols-4"><span className="text-slate-500 font-medium">Nama Sesuai SK</span><span className="col-span-3 font-sans">{targetLks.kemenkumhamName}</span></div>
+                    )}
                     <div className="grid grid-cols-4"><span className="text-slate-500 font-medium">No. STD</span><span className="col-span-3 font-mono">: {targetLks.stdNo || "-"}</span></div>
                     <div className="grid grid-cols-4"><span className="text-slate-500 font-medium">Kecamatan</span><span className="col-span-3">: {targetLks.district}</span></div>
                     <div className="grid grid-cols-4"><span className="text-slate-500 font-medium">Desa / Kelurahan</span><span className="col-span-3">: {targetLks.village}</span></div>

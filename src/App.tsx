@@ -63,6 +63,8 @@ function SiLksBloraApp() {
   // CSV Import guide state & ref
   const [showLksImportHelpModal, setShowLksImportHelpModal] = useState(false);
   const lksFileInputRef = useRef<HTMLInputElement>(null);
+  const [showPmImportHelpModal, setShowPmImportHelpModal] = useState(false);
+  const pmFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (peerNotifications.length > lastNotificationLength) {
@@ -500,13 +502,13 @@ function SiLksBloraApp() {
     const headers = [
       "Nama LKS", "Kecamatan", "Desa Kelurahan", "Alamat Lengkap", "WhatsApp Ketua", 
       "Tanggal Berdiri", "Status Keaktifan", "Nama Ketua", "Nama Sekretaris", "Nama Bendahara",
-      "No SK Kemenkumham", "NPWP", "No Tanda Daftar / STD", "Masa Berlaku STD", "Kedudukan LKS",
+      "No SK Kemenkumham", "Nama Sesuai SK Kemenkumham", "NPWP", "No Tanda Daftar / STD", "Masa Berlaku STD", "Kedudukan LKS",
       "Wilayah Kerja LKS", "Status Akreditasi", "Tahun Akreditasi", "Deskripsi Kegiatan", "Latitude", "Longitude"
     ];
     const rows = lksList.map(l => [
       l.name, l.district, l.village, l.address, l.whatsapp, 
       l.establishedDate, l.isActive ? "AKTIF" : "NON-AKTIF", l.chairman, l.secretary || "", l.treasurer || "",
-      l.kemenkumhamNo || "", l.npwp || "", l.stdNo || "", l.stdExpiryDate || "", l.position || "Pusat",
+      l.kemenkumhamNo || "", l.kemenkumhamName || "", l.npwp || "", l.stdNo || "", l.stdExpiryDate || "", l.position || "Pusat",
       l.workScope || "Kabupaten", l.accreditation || "Belum terakreditasi", l.accreditationYear || "",
       l.activityDescription || "", String(l.latitude || -6.9697), String(l.longitude || 111.4168)
     ]);
@@ -540,7 +542,7 @@ function SiLksBloraApp() {
 
           let newLks: LKS;
           if (row.length >= 15) {
-            // New complete 21-column schema
+            // New complete 22-column schema
             newLks = {
               id: `lks-csv-${Math.random().toString(36).substr(2, 9)}`,
               name: row[0] || "LKS Impor CSV",
@@ -554,17 +556,18 @@ function SiLksBloraApp() {
               secretary: row[8] || "",
               treasurer: row[9] || "",
               kemenkumhamNo: row[10] || "",
-              npwp: row[11] || "",
-              stdNo: row[12] || "",
-              stdExpiryDate: row[13] || "",
-              position: (row[14] || "Pusat") as "Pusat" | "Cabang",
-              workScope: (row[15] || "Kabupaten") as "Kabupaten" | "Provinsi" | "Nasional",
-              accreditation: (row[16] || "Belum terakreditasi") as any,
-              accreditationYear: row[17] || "",
+              kemenkumhamName: row[11] || "",
+              npwp: row[12] || "",
+              stdNo: row[13] || "",
+              stdExpiryDate: row[14] || "",
+              position: (row[15] || "Pusat") as "Pusat" | "Cabang",
+              workScope: (row[16] || "Kabupaten") as "Kabupaten" | "Provinsi" | "Nasional",
+              accreditation: (row[17] || "Belum terakreditasi") as any,
+              accreditationYear: row[18] || "",
               supportHistory: [],
-              activityDescription: row[18] || "Diimpor melalui CSV file upload.",
-              latitude: row[19] ? Number(row[19]) : -6.9697,
-              longitude: row[20] ? Number(row[20]) : 111.4168,
+              activityDescription: row[19] || "Diimpor melalui CSV file upload.",
+              latitude: row[20] ? Number(row[20]) : -6.9697,
+              longitude: row[21] ? Number(row[21]) : 111.4168,
               documents: {}
             };
           } else {
@@ -624,20 +627,20 @@ function SiLksBloraApp() {
     const headers = [
       "Nama LKS", "Kecamatan", "Desa Kelurahan", "Alamat Lengkap", "WhatsApp Ketua", 
       "Tanggal Berdiri", "Status Keaktifan", "Nama Ketua", "Nama Sekretaris", "Nama Bendahara",
-      "No SK Kemenkumham", "NPWP", "No Tanda Daftar / STD", "Masa Berlaku STD", "Kedudukan LKS",
+      "No SK Kemenkumham", "Nama Sesuai SK Kemenkumham", "NPWP", "No Tanda Daftar / STD", "Masa Berlaku STD", "Kedudukan LKS",
       "Wilayah Kerja LKS", "Status Akreditasi", "Tahun Akreditasi", "Deskripsi Kegiatan", "Latitude", "Longitude"
     ];
     const sampleRows = [
       [
         "LKS Harapan Mulia", "Blora", "Mlangsen", "Jl. Pemuda No. 12", "08123456789", 
         "2021-08-17", "AKTIF", "H. Ahmad Sukarno", "Budi Hermawan", "Siti Lestari",
-        "AHU-0012345.AH.01.04.Tahun 2021", "01.234.567.8-012.000", "503/123/STD/2021", "2525-12-31", "Pusat",
+        "AHU-0012345.AH.01.04.Tahun 2021", "SAYAP HARAPAN MULIA BLORA", "01.234.567.8-012.000", "503/123/STD/2021", "2525-12-31", "Pusat",
         "Kabupaten", "Akreditasi A", "2021", "Lembaga asuhan anak yatim piatu dan jompo terlantar.", "-6.9697", "111.4168"
       ],
       [
         "LKS Berkarya Jaya", "Cepu", "Balun", "Jl. Ronggolawe Gang 2 No. 5", "08571234567", 
         "2019-11-10", "NON-AKTIF", "Siti Aminah, S.Pd", "Harto Setiadi", "Rini Indriani",
-        "AHU-5523121.AH.01.04.Tahun 2019", "01.234.567.8-013.000", "503/456/STD/2019", "2024-11-10", "Cabang",
+        "AHU-5523121.AH.01.04.Tahun 2019", "YAYASAN KARYA JAYA CEPU", "01.234.567.8-013.000", "503/456/STD/2019", "2024-11-10", "Cabang",
         "Provinsi", "Akreditasi B", "2019", "Pemberdayaan disabilitas fisik melalui pelatihan menjahit.", "-7.0125", "111.5841"
       ]
     ];
@@ -661,6 +664,44 @@ function SiLksBloraApp() {
     link.click();
     document.body.removeChild(link);
     showToast("success", "Template Didownload", "Template berkas CSV berhasil disimpan. Silakan isi data sesuai struktur tersebut.");
+  };
+
+  // Download PM CSV Template for User Ease
+  const downloadPmCsvTemplate = () => {
+    const headers = [
+      "Nama LKS", "Nama PM", "NIK", "No KK", "Tempat Lahir", "Tanggal Lahir (YYYY-MM-DD)",
+      "Usia", "Jenis Kelamin (L/P)", "Kecamatan", "Desa", "Kategori PM (Dalam/Luar)", "Keterangan"
+    ];
+    const sampleRows = [
+      [
+        "LKS Harapan Mulia", "Ahmad Fauzi", "3316041205930002", "3316041112010091", "Blora", "1993-05-12",
+        "32", "L", "Blora", "Mlangsen", "Dalam", "Mendapat santunan sandang pangan rutin harian."
+      ],
+      [
+        "LKS Harapan Mulia", "Siti Rahmawati", "3316024108870001", "3316021212000084", "Kunduran", "1987-08-21",
+        "38", "P", "Kunduran", "Sambiroto", "Luar", "Pemberdayaan keterampilan ekonomi produktif."
+      ]
+    ];
+
+    const csvContent = [
+      headers.join(","),
+      ...sampleRows.map(row => 
+        row.map(val => {
+          const clean = val.replace(/"/g, '""');
+          return clean.includes(",") || clean.includes("\n") || clean.includes('"') ? `"${clean}"` : clean;
+        }).join(",")
+      )
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "Template_Import_Penerima_Manfaat.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("success", "Template Didownload", "Template berkas CSV PM berhasil didownload.");
   };
 
   // Beneficiary Exports
@@ -740,6 +781,7 @@ function SiLksBloraApp() {
         }
 
         showToast("success", "PM Impor Sukses", `Berhasil memasukkan ${newPmRecords.length} PM baru ke pembinaan LKS dari CSV.`);
+        setShowPmImportHelpModal(false);
       } catch (err) {
         showToast("error", "Parsing CSV Gagal", "Sejajarkan template kolom PM Anda sebelum upload.");
       }
@@ -1614,16 +1656,21 @@ function SiLksBloraApp() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowPmImportHelpModal(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer"
+                    >
                       <FileUp className="w-3.5 h-3.5" />
                       Import CSV PM
-                      <input
-                        type="file"
-                        accept=".csv"
-                        onChange={handleImportPmCsv}
-                        className="hidden"
-                      />
-                    </label>
+                    </button>
+                    <input
+                      ref={pmFileInputRef}
+                      type="file"
+                      accept=".csv"
+                      onChange={handleImportPmCsv}
+                      className="hidden"
+                    />
 
                     <button
                       onClick={() => setEditingPm(null)}
@@ -2306,60 +2353,66 @@ function SiLksBloraApp() {
                     </tr>
                     <tr>
                       <td className="p-2 pl-4 font-bold text-slate-400">12</td>
+                      <td className="p-2 font-bold text-indigo-600">Nama Sesuai SK Kemenkumham</td>
+                      <td className="p-2 text-slate-500">Nama resmi terdaftar di Kemenkumham</td>
+                      <td className="p-2 text-slate-700 italic">SAYAP HARAPAN MULIA BLORA</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">13</td>
                       <td className="p-2 font-bold text-indigo-600">NPWP</td>
                       <td className="p-2 text-slate-500">Nomor NPWP lembaga (opsional)</td>
                       <td className="p-2 text-slate-700 font-mono text-[10px]">01.234.567.8-012.000</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 font-bold text-slate-400">13</td>
+                      <td className="p-2 pl-4 font-bold text-slate-400">14</td>
                       <td className="p-2 font-bold text-indigo-600">No Tanda Daftar / STD</td>
                       <td className="p-2 text-slate-500">Nomor Surat Tanda Daftar</td>
                       <td className="p-2 text-slate-700 font-mono text-[10px]">503/123/STD/2021</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 font-bold text-slate-400">14</td>
+                      <td className="p-2 pl-4 font-bold text-slate-400">15</td>
                       <td className="p-2 font-bold text-indigo-600">Masa Berlaku STD</td>
                       <td className="p-2 text-slate-500">Format tanggal (YYYY-MM-DD)</td>
                       <td className="p-2 text-slate-700 font-mono text-[10px]">2525-12-31</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 font-bold text-slate-400">15</td>
+                      <td className="p-2 pl-4 font-bold text-slate-400">16</td>
                       <td className="p-2 font-bold text-indigo-600">Kedudukan LKS</td>
                       <td className="p-2 text-slate-500"><strong className="text-slate-800">Pusat</strong> atau <strong className="text-slate-800">Cabang</strong></td>
                       <td className="p-2 text-slate-700 italic">Pusat</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 font-bold text-slate-400">16</td>
+                      <td className="p-2 pl-4 font-bold text-slate-400">17</td>
                       <td className="p-2 font-bold text-indigo-600">Wilayah Kerja LKS</td>
                       <td className="p-2 text-slate-550"><strong className="text-slate-800">Kabupaten</strong>, <strong className="text-slate-800">Provinsi</strong>, atau <strong className="text-slate-800">Nasional</strong></td>
                       <td className="p-2 text-slate-700 italic">Kabupaten</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 font-bold text-slate-400">17</td>
+                      <td className="p-2 pl-4 font-bold text-slate-400">18</td>
                       <td className="p-2 font-bold text-indigo-600">Status Akreditasi</td>
                       <td className="p-2 text-slate-500">Tingkat Akreditasi (A/B/C/D/Belum terakreditasi)</td>
                       <td className="p-2 text-slate-700 italic">Akreditasi A</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 font-bold text-slate-400">18</td>
+                      <td className="p-2 pl-4 font-bold text-slate-400">19</td>
                       <td className="p-2 font-bold text-indigo-600">Tahun Akreditasi</td>
                       <td className="p-2 text-slate-500">Tahun sidang keputusan akreditasi</td>
                       <td className="p-2 text-slate-700 font-mono text-[10px]">2021</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 font-bold text-slate-400">19</td>
+                      <td className="p-2 pl-4 font-bold text-slate-400">20</td>
                       <td className="p-2 font-bold text-indigo-600">Deskripsi Kegiatan</td>
                       <td className="p-2 text-slate-500">Penjelasan singkat tentang fokus pembinaan LKS</td>
                       <td className="p-2 text-slate-700 italic">Laks asuhan yatim piatu...</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 font-bold text-slate-400">20</td>
+                      <td className="p-2 pl-4 font-bold text-slate-400">21</td>
                       <td className="p-2 font-bold text-indigo-600">Latitude</td>
                       <td className="p-2 text-slate-500">Koordinat peta latitude (opsional, desimal)</td>
                       <td className="p-2 text-slate-700 font-mono text-[10px]">-6.9697</td>
                     </tr>
                     <tr>
-                      <td className="p-2 pl-4 font-bold text-slate-400">21</td>
+                      <td className="p-2 pl-4 font-bold text-slate-400">22</td>
                       <td className="p-2 font-bold text-indigo-600">Longitude</td>
                       <td className="p-2 text-slate-500">Koordinat peta longitude (opsional, desimal)</td>
                       <td className="p-2 text-slate-700 font-mono text-[10px]">111.4168</td>
@@ -2372,8 +2425,8 @@ function SiLksBloraApp() {
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shrink-0">
                 <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Contoh Baris Mentah (Comma-Separated CSV)</span>
                 <pre className="text-[10px] font-mono text-slate-600 overflow-x-auto whitespace-pre p-2.5 bg-white border border-slate-150 rounded-xl leading-relaxed">
-{`Nama LKS,Kecamatan,Desa Kelurahan,Alamat Lengkap,WhatsApp Ketua,Tanggal Berdiri,Status Keaktifan,Nama Ketua,Nama Sekretaris,Nama Bendahara,No SK Kemenkumham,NPWP,No Tanda Daftar / STD,Masa Berlaku STD,Kedudukan LKS,Wilayah Kerja LKS,Status Akreditasi,Tahun Akreditasi,Deskripsi Kegiatan,Latitude,Longitude
-LKS Harapan Mulia,Blora,Mlangsen,Jl. Pemuda No. 12,08123456789,2021-08-17,AKTIF,H. Ahmad Sukarno,Budi Hermawan,Siti Lestari,AHU-0012345.AH.01.04.Tahun 2021,01.234.567.8-012.000,503/123/STD/2021,2525-12-31,Pusat,Kabupaten,Akreditasi A,2021,Lembaga asuhan anak yatim piatu dan jompo terlantar.,-6.9697,111.4168`}
+{`Nama LKS,Kecamatan,Desa Kelurahan,Alamat Lengkap,WhatsApp Ketua,Tanggal Berdiri,Status Keaktifan,Nama Ketua,Nama Sekretaris,Nama Bendahara,No SK Kemenkumham,Nama Sesuai SK Kemenkumham,NPWP,No Tanda Daftar / STD,Masa Berlaku STD,Kedudukan LKS,Wilayah Kerja LKS,Status Akreditasi,Tahun Akreditasi,Deskripsi Kegiatan,Latitude,Longitude
+LKS Harapan Mulia,Blora,Mlangsen,Jl. Pemuda No. 12,08123456789,2021-08-17,AKTIF,H. Ahmad Sukarno,Budi Hermawan,Siti Lestari,AHU-0012345.AH.01.04.Tahun 2021,SAYAP HARAPAN MULIA BLORA,01.234.567.8-012.000,503/123/STD/2021,2525-12-31,Pusat,Kabupaten,Akreditasi A,2021,Lembaga asuhan anak yatim piatu dan jompo terlantar.,-6.9697,111.4168`}
                 </pre>
               </div>
             </div>
@@ -2400,6 +2453,166 @@ LKS Harapan Mulia,Blora,Mlangsen,Jl. Pemuda No. 12,08123456789,2021-08-17,AKTIF,
                 <button
                   type="button"
                   onClick={() => lksFileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4.5 py-2.5 bg-slate-900 border border-slate-950 rounded-xl text-white hover:bg-slate-800 text-xs font-black shadow-md transition-all cursor-pointer"
+                >
+                  <FileUp className="w-4 h-4" />
+                  Pilih Berkas & Impor
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Format Tutorial Modal for PM */}
+      {showPmImportHelpModal && (
+        <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="px-6 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 bg-indigo-50 border border-indigo-100 text-indigo-650 rounded-xl flex items-center justify-center">
+                  <FileUp className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 leading-none">Format Panduan Unggah CSV Penerima Manfaat</h3>
+                  <p className="text-[10px] text-slate-450 mt-1 font-medium font-mono">Blora PM Schema System</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPmImportHelpModal(false)}
+                className="w-8 h-8 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center cursor-pointer transition-colors focus:outline-none"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content with scrolling if necessary */}
+            <div className="p-6 overflow-y-auto space-y-5 text-slate-700">
+              <p className="text-xs leading-relaxed text-slate-500">
+                Kolom-kolom di dalam berkas spreadsheet Anda (.csv) harus <strong className="text-slate-900 font-extrabold">cocok dan sejajar</strong> dengan urutan tabel di bawah agar sistem dapat memproses baris data secara benar.
+              </p>
+
+              {/* Table listing columns and descriptions */}
+              <div className="border border-slate-150 rounded-2xl overflow-y-auto max-h-[35vh]">
+                <table className="w-full text-left text-[11px] border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-150 text-slate-500 font-bold sticky top-0">
+                      <th className="p-3 pl-4">No</th>
+                      <th className="p-3">Nama Kolom</th>
+                      <th className="p-3">Persyaratan / Deskripsi</th>
+                      <th className="p-3 pr-4">Contoh Isi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">1</td>
+                      <td className="p-2 font-bold text-indigo-600">Nama LKS</td>
+                      <td className="p-2 text-slate-500">Nama lengkap atau kependekan LKS untuk dikaitkan</td>
+                      <td className="p-2 text-slate-700 italic">LKS Harapan Mulia</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">2</td>
+                      <td className="p-2 font-bold text-indigo-600">Nama PM</td>
+                      <td className="p-2 text-slate-500">Nama lengkap Penerima Manfaat (Wajib)</td>
+                      <td className="p-2 text-slate-700 italic">Ahmad Fauzi</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">3</td>
+                      <td className="p-2 font-bold text-indigo-600">NIK</td>
+                      <td className="p-2 text-slate-500">16 Digit Nomor Induk Kependudukan</td>
+                      <td className="p-2 text-slate-700 font-mono text-[10px]">3316041205930002</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">4</td>
+                      <td className="p-2 font-bold text-indigo-600">No KK</td>
+                      <td className="p-2 text-slate-500">16 Digit Nomor Kartu Keluarga</td>
+                      <td className="p-2 text-slate-700 font-mono text-[10px]">3316041112010091</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">5</td>
+                      <td className="p-2 font-bold text-indigo-600">Tempat Lahir</td>
+                      <td className="p-2 text-slate-500">Kabupaten atau kota kelahiran</td>
+                      <td className="p-2 text-slate-700 italic">Blora</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">6</td>
+                      <td className="p-2 font-bold text-indigo-600">Tanggal Lahir</td>
+                      <td className="p-2 text-slate-500">Format penulisan YYYY-MM-DD</td>
+                      <td className="p-2 text-slate-700 font-mono text-[10px]">1993-05-12</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">7</td>
+                      <td className="p-2 font-bold text-indigo-600">Usia</td>
+                      <td className="p-2 text-slate-500">Angka umur (opsional)</td>
+                      <td className="p-2 text-slate-700 font-mono text-[10px]">32</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">8</td>
+                      <td className="p-2 font-bold text-indigo-600">Jenis Kelamin</td>
+                      <td className="p-2 text-slate-500">Isi dengan huruf <span className="font-bold">L</span> atau <span className="font-bold">P</span></td>
+                      <td className="p-2 text-slate-700 text-[10px]">L</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">9</td>
+                      <td className="p-2 font-bold text-indigo-600">Kecamatan</td>
+                      <td className="p-2 text-slate-500">Kecamatan domisili asli PM</td>
+                      <td className="p-2 text-slate-700 italic">Blora</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">10</td>
+                      <td className="p-2 font-bold text-indigo-600">Desa Kelurahan</td>
+                      <td className="p-2 text-slate-500">Desa tempat tinggal PM</td>
+                      <td className="p-2 text-slate-700 italic">Mlangsen</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">11</td>
+                      <td className="p-2 font-bold text-indigo-600">Kategori PM</td>
+                      <td className="p-2 text-slate-500">Isi <strong className="text-slate-800">Dalam</strong> (panti) atau <strong className="text-slate-800">Luar</strong> (non-panti)</td>
+                      <td className="p-2 text-slate-700 italic">Dalam</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 pl-4 font-bold text-slate-400">12</td>
+                      <td className="p-2 font-bold text-indigo-600">Keterangan</td>
+                      <td className="p-2 text-slate-500">Catatan kondisi/bantuan sosial</td>
+                      <td className="p-2 text-slate-700 italic">Mendapat santunan sandang pangan rutin harian.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* RAW CSV String Visualizer */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shrink-0">
+                <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Contoh Baris Mentah (Comma-Separated CSV)</span>
+                <pre className="text-[10px] font-mono text-slate-600 overflow-x-auto whitespace-pre p-2.5 bg-white border border-slate-150 rounded-xl leading-relaxed">
+{`Nama LKS,Nama PM,NIK,No KK,Tempat Lahir,Tanggal Lahir,Usia,Jenis Kelamin,Kecamatan,Desa,Kategori PM,Keterangan
+LKS Harapan Mulia,Ahmad Fauzi,3316041205930002,3316041112010091,Blora,1993-05-12,32,L,Blora,Mlangsen,Dalam,Mendapat santunan pangan rutin.`}
+                </pre>
+              </div>
+            </div>
+
+            {/* Footer with actions */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={downloadPmCsvTemplate}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-150 rounded-xl text-indigo-700 text-xs font-bold transition-all cursor-pointer"
+              >
+                <FileDown className="w-4 h-4 text-indigo-600" />
+                Unduh Template CSV
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPmImportHelpModal(false)}
+                  className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => pmFileInputRef.current?.click()}
                   className="flex items-center gap-2 px-4.5 py-2.5 bg-slate-900 border border-slate-950 rounded-xl text-white hover:bg-slate-800 text-xs font-black shadow-md transition-all cursor-pointer"
                 >
                   <FileUp className="w-4 h-4" />

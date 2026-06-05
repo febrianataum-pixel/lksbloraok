@@ -37,6 +37,7 @@ export const LksForm: React.FC<LksFormProps> = ({
 
   // Legalitas
   const [kemenkumhamNo, setKemenkumhamNo] = useState(initialData?.kemenkumhamNo || "");
+  const [kemenkumhamName, setKemenkumhamName] = useState(initialData?.kemenkumhamName || "");
   const [npwp, setNpwp] = useState(initialData?.npwp || "");
   const [stdNo, setStdNo] = useState(initialData?.stdNo || "");
   const [stdExpiryDate, setStdExpiryDate] = useState(initialData?.stdExpiryDate || "");
@@ -134,6 +135,7 @@ export const LksForm: React.FC<LksFormProps> = ({
       secretary: secretary.trim(),
       treasurer: treasurer.trim(),
       kemenkumhamNo: kemenkumhamNo.trim(),
+      kemenkumhamName: kemenkumhamName.trim(),
       npwp: npwp.trim(),
       stdNo: stdNo.trim(),
       stdExpiryDate,
@@ -366,6 +368,18 @@ export const LksForm: React.FC<LksFormProps> = ({
         {/* TAB 3: Legalitas & Pekerjaan */}
         {activeSubTab === "legalitas" && (
           <div className="space-y-4 max-w-2xl">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">Nama Sesuai dengan SK Kemenkumham</label>
+              <input
+                type="text"
+                value={kemenkumhamName}
+                onChange={(e) => setKemenkumhamName(e.target.value)}
+                className="w-full text-xs font-medium rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm focus:border-slate-400 focus:bg-white outline-none font-sans"
+                placeholder="cth: YAYASAN BHAKTI MULIA BLORA"
+                id="lks-kemenkumham-name-input"
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">No SK Kemenkumham</label>
@@ -375,6 +389,7 @@ export const LksForm: React.FC<LksFormProps> = ({
                   onChange={(e) => setKemenkumhamNo(e.target.value)}
                   className="w-full text-xs font-medium rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm focus:border-slate-400 focus:bg-white outline-none font-mono"
                   placeholder="AHU-00XXXX.AH.XX..."
+                  id="lks-kemenkumham-no-input"
                 />
               </div>
 
@@ -386,6 +401,7 @@ export const LksForm: React.FC<LksFormProps> = ({
                   onChange={(e) => setNpwp(e.target.value)}
                   className="w-full text-xs font-medium rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm focus:border-slate-400 focus:bg-white outline-none font-mono"
                   placeholder="12.345.678.9-514.000"
+                  id="lks-npwp-input"
                 />
               </div>
             </div>

@@ -17,6 +17,7 @@
         "secretary": { "type": "string" },
         "treasurer": { "type": "string" },
         "kemenkumhamNo": { "type": "string" },
+        "kemenkumhamName": { "type": "string" },
         "npwp": { "type": "string" },
         "stdNo": { "type": "string" },
         "stdExpiryDate": { "type": "string" },

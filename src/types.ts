@@ -40,6 +40,7 @@ export interface LKS {
   
   // Legalitas
   kemenkumhamNo: string;
+  kemenkumhamName?: string;
   npwp: string;
   stdNo: string;
   stdExpiryDate: string;
