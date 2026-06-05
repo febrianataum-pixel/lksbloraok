@@ -41,5 +41,12 @@ service cloud.firestore {
       allow read: if isSignedIn() || true; // Public or auth users can read banner or general settings
       allow write: if isSignedIn() && isValidId(settingId);
     }
+
+    // Rules for notifications
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(notificationId);
+      allow update, delete: if isSignedIn() && isValidId(notificationId);
+    }
   }
 }

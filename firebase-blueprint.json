@@ -71,6 +71,20 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["headOfDinsos", "nipOfDinsos"]
+    },
+    "NotificationItem": {
+      "title": "NotificationItem",
+      "description": "Log activities of LKS and PM updates in real-time",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user": { "type": "string" },
+        "action": { "type": "string" },
+        "time": { "type": "string" },
+        "avatarColor": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user", "action", "time", "avatarColor"]
     }
   },
   "firestore": {
@@ -85,6 +99,10 @@
     "/settings/{settingId}": {
       "schema": "Settings",
       "description": "Dynamic general configuration settings like leadership and agency info"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "NotificationItem",
+      "description": "Log activities of LKS and PM updates in real-time"
     }
   }
 }
