@@ -395,26 +395,26 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
       {/* Interactive File Live Preview Overlay Model */}
       <AnimatePresence>
         {previewDoc && (
-          <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[100] flex items-center justify-center p-2 sm:p-4 animate-fade-in">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col h-[85vh]"
+              className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col h-[90vh] sm:h-[85vh]"
             >
-              <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-emerald-400" />
+              <div className="p-4 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <FileText className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
                     <h3 className="font-bold text-sm leading-snug">{previewDoc.typeName}</h3>
-                    <p className="text-[10px] text-slate-400 font-mono">
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">
                       Diupload: {previewDoc.date} | Ukuran: {previewDoc.size}
                       {previewDoc.isCompressed && ` (Hemat ${previewDoc.compressionSavings}%)`}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t border-slate-800 pt-2 sm:border-0 sm:pt-0">
                   {previewDoc.url && previewDoc.url !== "#" ? (
                     <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded font-bold font-mono uppercase tracking-wider">
                       ● Berkas Upload Live
@@ -434,35 +434,72 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
               </div>
 
               {/* Document display viewport */}
-              <div className="flex-1 bg-slate-100 flex items-center justify-center p-6 overflow-y-auto">
+              <div className="flex-1 bg-slate-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
                 {previewDoc.url && previewDoc.url !== "#" ? (
                   /* RENDER REAL UPLOADED FILE */
-                  <div className="w-full h-full flex items-center justify-center">
+                  <div className="w-full h-full flex flex-col gap-3">
                     {previewDoc.url.includes("data:application/pdf") || previewDoc.docName.toLowerCase().endsWith(".pdf") ? (
-                      <div className="w-full h-full bg-white rounded-xl shadow-md overflow-hidden border border-slate-200">
-                        <iframe 
-                          src={previewDoc.url} 
-                          title="Pratinjau Dokumen PDF"
-                          className="w-full h-[60vh] bg-white"
-                        />
+                      <div className="w-full h-full flex flex-col gap-3">
+                        {/* Mobile Help Banner */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl shrink-0">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0"></span>
+                            <span className="text-[11px] font-bold text-indigo-900 leading-snug">
+                              Pratinjau PDF interaktif terkadang terbatas pada layar ponsel tertentu.
+                            </span>
+                          </div>
+                          <a
+                            href={previewDoc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[10px] font-black rounded-lg transition-all shadow-sm shrink-0"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Buka Layar Penuh / Unduh PDF
+                          </a>
+                        </div>
+                        
+                        {/* PDF Render */}
+                        <div className="flex-1 bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200 min-h-[350px]">
+                          <iframe 
+                            src={previewDoc.url} 
+                            title="Pratinjau Dokumen PDF"
+                            className="w-full h-full bg-white"
+                          />
+                        </div>
                       </div>
                     ) : (
-                      <div className="bg-slate-900 p-4 rounded-xl shadow-inner max-w-full max-h-[60vh] flex items-center justify-center overflow-hidden border border-slate-800">
-                        <img 
-                          src={previewDoc.url} 
-                          alt={previewDoc.docName}
-                          className="max-w-full max-h-[55vh] object-contain rounded border-2 border-white/95 shadow-xl"
-                        />
+                      <div className="w-full h-full flex flex-col gap-3 justify-center items-center">
+                        <div className="w-full flex justify-end shrink-0">
+                          <a
+                            href={previewDoc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Buka Gambar Layar Penuh
+                          </a>
+                        </div>
+                        
+                        {/* Image Render wrapper */}
+                        <div className="bg-slate-900/5 p-2 sm:p-4 rounded-xl shadow-inner max-w-full max-h-[55vh] flex items-center justify-center overflow-auto border border-slate-200/50 bg-white">
+                          <img 
+                            src={previewDoc.url} 
+                            alt={previewDoc.docName}
+                            className="max-w-full max-h-[50vh] object-contain rounded-lg border border-slate-200 shadow-md"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
                 ) : (
                   /* RENDER HIGH FREQUENCY MOCK PREVIEWS FOR PRELOADED DATA */
-                  <div className="w-full max-w-lg aspect-[1/1.414] bg-white rounded-xl shadow-lg border border-slate-200 p-6 sm:p-8 text-slate-800 overflow-y-auto flex flex-col justify-between relative">
+                  <div className="w-full max-w-lg bg-white rounded-xl shadow-lg border border-slate-200 p-4 sm:p-8 text-slate-800 overflow-y-auto flex flex-col justify-between relative min-h-[450px]">
                     
                     {/* Badge watermark */}
                     <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
-                      <FileText className="w-80 h-80 text-slate-900" />
+                      <FileText className="w-60 h-60 text-slate-900" />
                     </div>
 
                     {previewDoc.typeName.toLowerCase().includes("ktp") ? (
@@ -472,7 +509,7 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                           💳 FORMAT SIMULASI KARTU IDENTITAS KETUA (KTP RI)
                         </div>
                         
-                        <div className="bg-sky-100/40 border-2 border-sky-300 rounded-xl p-4 shadow-sm text-slate-900 text-left relative overflow-hidden" style={{ backgroundImage: "linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)" }}>
+                        <div className="bg-sky-100/40 border-2 border-sky-300 rounded-xl p-3 sm:p-4 shadow-sm text-slate-900 text-left relative overflow-hidden" style={{ backgroundImage: "linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)" }}>
                           {/* Map Background simulated effect */}
                           <div className="absolute right-0 bottom-0 top-0 w-1/3 opacity-15 bg-cover pointer-events-none" style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1580618672591-eb180b1a973f?q=80&w=300")' }}></div>
                           
@@ -485,7 +522,7 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                             KARTU TANDA PENDUDUK
                           </div>
 
-                          <div className="grid grid-cols-3 gap-1.5 text-[8px] sm:text-[9.5px]">
+                          <div className="grid grid-cols-3 gap-2 text-[8px] sm:text-[9.5px]">
                             <div className="col-span-2 space-y-1">
                               <div>
                                 <span className="font-mono font-bold text-slate-800 text-[9.5px] sm:text-[11px] select-all">NIK : 3316042407810012</span>
@@ -500,23 +537,23 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                               </div>
                               <div className="grid grid-cols-4"><span className="text-slate-500">Agama</span><span className="col-span-3">: ISLAM</span></div>
                               <div className="grid grid-cols-4"><span className="text-slate-500">Status Kawin</span><span className="col-span-3">: KAWIN</span></div>
-                              <div className="grid grid-cols-4"><span className="text-slate-500">Pekerjaan</span><span className="col-span-3 uppercase">: KETUA LKS {selectedLks?.name}</span></div>
+                              <div className="grid grid-cols-4"><span className="text-slate-500">Pekerjaan</span><span className="col-span-3 uppercase text-[7px] sm:text-[8.5px]">: KETUA LKS {selectedLks?.name}</span></div>
                               <div className="grid grid-cols-4"><span className="text-slate-500">Berlaku Hingga</span><span className="col-span-3 font-bold text-emerald-700">: SEUMUR HIDUP</span></div>
                             </div>
                             
                             <div className="flex flex-col items-center justify-between pl-1">
                               {/* Photo placeholder with red/blue typical bg */}
                               <div className="w-[100%] aspect-[3/4] bg-rose-700 border border-slate-350 shadow rounded overflow-hidden flex items-center justify-center p-0.5 relative">
-                                <span className="absolute bottom-1 bg-black/50 text-[6px] text-white px-1 leading-none font-mono">PAST-FOTO</span>
+                                <span className="absolute bottom-1 bg-black/50 text-[6px] text-white px-1 leading-none font-mono">PAS-FOTO</span>
                                 <div className="w-10 h-10 border-2 border-white rounded-full bg-slate-200/80 flex items-center justify-center shadow-lg transform scale-110">
-                                  <span className="text-slate-500 font-bold text-[8px] uppercase">LKS</span>
+                                  <span className="text-slate-500 font-bold text-[8px] uppercase font-sans">LKS</span>
                                 </div>
                               </div>
                               
                               <div className="text-center font-mono text-[6px] text-slate-500 mt-2">
                                 BLORA, {selectedLks?.establishedDate || "2021-08-17"}<br/>
                                 <span className="font-bold underline text-slate-800">Ttd Pimpinan</span>
-                                <div className="h-6 w-12 border-b border-dashed border-slate-350 mx-auto mt-0.5 flex items-center justify-center text-[8px] italic text-slate-400 font-serif">
+                                <div className="h-6 w-12 border-b border-dashed border-slate-350 mx-auto mt-0.5 flex items-center justify-center text-[8px] italic text-slate-450 font-serif">
                                   Signed
                                 </div>
                               </div>
@@ -524,7 +561,7 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                           </div>
                         </div>
 
-                        <div className="text-[10px] text-slate-400 leading-relaxed max-w-sm mx-auto text-center border-t border-slate-100 pt-5">
+                        <div className="text-[10px] text-slate-400 leading-relaxed max-w-sm mx-auto text-center border-t border-slate-100 pt-5 mt-4">
                           <p>Dokumen asli KTP disimpan aman dalam enkripsi server. Gunakan tombol <strong className="text-slate-700">Edit Berkas</strong> di belakang untuk mengupload file hasil scan (.jpg/.png/.pdf) KTP ketua Anda sendiri.</p>
                         </div>
                       </div>
@@ -546,14 +583,14 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                           <p className="text-[8px] italic mt-1 text-slate-500 leading-snug">TENTANG PENGESAHAN PENDIRIAN BADAN HUKUM PERKUMPULAN SOSIAL</p>
                         </div>
 
-                        <div className="text-[8.5px] sm:text-[9.5px] space-y-2 text-justify leading-relaxed font-sans font-medium text-slate-700">
+                        <div className="text-[8.5px] sm:text-[9.5px] space-y-2 text-justify leading-relaxed font-sans font-medium text-slate-705">
                           <p>
                             <strong>MENIMBANG:</strong> Bahwa permohonan pengesahan pendirian badan hukum dari pimpinan perkumpulan telah sesuai dengan tata peraturan Perundang-undangan Sosial Republik Indonesia;
                           </p>
                           <p>
                             <strong>MEMUTUSKAN &amp; MENETAPKAN:</strong> Memberikan status pengakuan badan hukum kepada perkumpulan sosial:
                           </p>
-                          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-150 font-serif my-1 text-center font-extrabold text-[10px] sm:text-[11px] text-slate-950">
+                          <div className="bg-slate-50 p-2 sm:p-2.5 rounded-lg border border-slate-150 font-serif my-1 text-center font-extrabold text-[10px] sm:text-[11px] text-slate-950 leading-snug">
                             "{selectedLks?.kemenkumhamName || selectedLks?.name.toUpperCase()}"
                             <div className="text-[7.5px] font-sans text-slate-500 font-semibold mt-1">
                               No. Registrasi Kemenkumham: {selectedLks?.kemenkumhamNo || "AHU-DEFAULT-2026"}
@@ -583,27 +620,27 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                       /* SURAT TANDA DAFTAR (STD) DESIGN */
                       <div className="flex flex-col h-full justify-between font-serif text-slate-900">
                         {/* Kop Surat Pemerintah */}
-                        <div className="text-center space-y-1.5 border-b-2 border-double border-slate-800 pb-2 mb-3">
+                        <div className="text-center space-y-1 border-b-2 border-double border-slate-800 pb-1.5 mb-2">
                           <h2 className="text-[10px] sm:text-[11px] font-sans font-extrabold uppercase leading-tight tracking-wide text-slate-950">
                             PEMERINTAH KABUPATEN BLORA
                           </h2>
-                          <h1 className="text-xs sm:text-[13px] font-sans font-black uppercase leading-tight tracking-wide text-indigo-900">
+                          <h1 className="text-[11px] sm:text-xs font-sans font-black uppercase leading-tight tracking-wide text-indigo-900">
                             DINAS SOSIAL, PEMBERDAYAAN PEREMPUAN<br/>DAN PERLINDUNGAN ANAK
                           </h1>
-                          <p className="text-[7.5px] font-sans text-slate-500 font-medium">Jl. Pemuda No. 44, Telp (0296) 531012, Blora, Jawa Tengah 58211</p>
+                          <p className="text-[7px] font-sans text-slate-500">Jl. Pemuda No. 44, Telp (0296) 531012, Blora, Jawa Tengah 58211</p>
                         </div>
 
-                        <div className="text-center mb-3">
-                          <h3 className="text-[10px] tracking-widest font-sans font-extrabold uppercase text-slate-950 underline decoration-indigo-600">SURAT TANDA DAFTAR OLEH DINAS</h3>
-                          <p className="text-[8.5px] font-mono mt-0.5 text-slate-600">Nomor: {selectedLks?.stdNo || "050/342/STD/2024"}</p>
+                        <div className="text-center mb-2">
+                          <h3 className="text-[9.5px] tracking-widest font-sans font-extrabold uppercase text-slate-950 underline decoration-indigo-600">SURAT TANDA DAFTAR OLEH DINAS</h3>
+                          <p className="text-[8px] font-mono mt-0.5 text-slate-600">Nomor: {selectedLks?.stdNo || "050/342/STD/2024"}</p>
                         </div>
 
-                        <div className="text-[8.5px] sm:text-[9.5px] space-y-2.5 font-sans font-medium text-slate-700 leading-relaxed text-justify">
+                        <div className="text-[8.5px] sm:text-[9.5px] space-y-2 font-sans font-medium text-slate-700 leading-relaxed text-justify">
                           <p>
                             Berdasarkan hasil verifikasi lapangan dan pemenuhan berkas administrasi, Dinas Sosial PPPA Kabupaten Blora dengan ini menerangkan bahwa Lembaga Kesejahteraan Sosial (LKS):
                           </p>
                           
-                          <div className="bg-amber-50/50 p-3 rounded-lg border border-amber-100 space-y-1 text-[8px] sm:text-[9px] text-slate-800">
+                          <div className="bg-amber-50/50 p-2.5 rounded-lg border border-amber-100 space-y-1 text-[8px] sm:text-[9px] text-slate-800">
                             <div className="grid grid-cols-4 font-extrabold text-[9.5px] text-slate-950"><span className="text-slate-500 font-normal">Nama LKS</span><span className="col-span-3">: {selectedLks?.name}</span></div>
                             <div className="grid grid-cols-4"><span className="text-slate-500">Ketua LKS</span><span className="col-span-3 font-semibold">: {selectedLks?.chairman}</span></div>
                             <div className="grid grid-cols-4"><span className="text-slate-500">Alamat LKS</span><span className="col-span-3 truncate">: {selectedLks?.address}</span></div>
@@ -613,21 +650,21 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                           <p>
                             Telah terdaftar secara resmi di Dinas Sosial Kabupaten Blora dan diberikan izin melakukan aktivitas pembinaan kesejahteraan sosial kemasyarakatan. Surat Tanda Daftar ini berlaku sampai dengan tanggal:
                           </p>
-                          <div className="text-center text-rose-700 font-mono font-bold text-[9px] sm:text-[10px] bg-rose-50 border border-rose-100 py-1.5 rounded-lg">
+                          <div className="text-center text-rose-750 font-mono font-bold text-[8.5px] sm:text-[9.5px] bg-rose-50 border border-rose-100 py-1 rounded-lg">
                             ⚠️ MASA BERLAKU S/D: {new Date(selectedLks?.stdExpiryDate || "2029-08-17").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
                           </div>
                         </div>
 
                         <div className="pt-2 mt-4 border-t border-slate-100 flex justify-between items-end font-sans">
-                          <div className="text-[7.5px] text-emerald-600 font-bold uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                          <div className="text-[7px]/none text-emerald-600 font-bold uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
                             TERDAFTAR RESMI
                           </div>
                           
-                          <div className="text-right text-[8.5px]">
+                          <div className="text-right text-[8px] sm:text-[8.5px]">
                             Blora, {previewDoc.date}<br/>
-                            <span className="text-slate-500 text-[8px]">KEPALA DINAS SOSIAL PPPA</span>
+                            <span className="text-slate-550 text-[7.5px]">KEPALA DINAS SOSIAL PPPA</span>
                             
-                            <div className="h-6 w-20 my-1 ml-auto flex items-center justify-center text-[7px] italic text-indigo-500 border border-dashed border-indigo-200 bg-indigo-50/20 font-bold uppercase tracking-wider">
+                            <div className="h-5 w-20 my-0.5 ml-auto flex items-center justify-center text-[6px]/none italic text-indigo-500 border border-dashed border-indigo-200 bg-indigo-50/20 font-bold uppercase tracking-wider">
                               DINAS SOSIAL BLUE STAMP
                             </div>
                             
@@ -638,26 +675,26 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                       </div>
                     ) : (
                       /* ACCREDITATION CERTIFICATE DESIGN */
-                      <div className="flex flex-col h-full justify-between text-slate-950 font-serif" style={{ border: "3px double #d97706", padding: "12px", borderRadius: "8px" }}>
+                      <div className="flex flex-col h-full justify-between text-slate-950 font-serif" style={{ border: "2px double #d97706", padding: "10px", borderRadius: "8px" }}>
                         <div className="text-center space-y-1 mb-2">
-                          <span className="text-[8px] tracking-widest font-sans font-extrabold uppercase text-amber-600 block">REPUBIK INDONESIA</span>
-                          <h2 className="text-[10px] sm:text-[11px] font-sans font-black uppercase tracking-wider">BADAN AKREDITASI LEMBAGA KESEJAHTERAAN SOSIAL</h2>
+                          <span className="text-[8px] tracking-widest font-sans font-extrabold uppercase text-amber-600 block">REPUBLIK INDONESIA</span>
+                          <h2 className="text-[9.5px] sm:text-[10px] font-sans font-black uppercase tracking-wider">BADAN AKREDITASI LEMBAGA KESEJAHTERAAN SOSIAL</h2>
                           <div className="h-0.5 bg-amber-500 w-1/3 mx-auto"></div>
                         </div>
 
-                        <div className="text-center my-2 space-y-1">
+                        <div className="text-center my-1.5 space-y-1">
                           <h3 className="text-xs font-black uppercase text-amber-700 tracking-wider">SERTIFIKAT AKREDITASI</h3>
                           <p className="text-[8px] font-sans font-bold text-slate-500 uppercase">AKREDITASI NASIONAL LKS</p>
                         </div>
 
-                        <div className="text-[8px] sm:text-[9.5px] space-y-2.5 font-sans font-medium text-slate-700 leading-relaxed text-center">
+                        <div className="text-[8px] sm:text-[9px] space-y-2 font-sans font-medium text-slate-700 leading-relaxed text-center">
                           <p>
                             Berdasarkan Surat Keputusan Sidang Pleno Asosiasi Akreditasi Lembaga Kesejahteraan Sosial, dengan ini memberikan akreditasi kelayakan operasional kepada lembaga:
                           </p>
                           
-                          <h2 className="text-center font-serif font-black text-slate-900 text-[11px] sm:text-[12px] bg-slate-50 border border-slate-150 py-2 rounded-xl my-2">
+                          <h2 className="text-center font-serif font-black text-slate-950 text-[10.5px] sm:text-[11px] bg-slate-50 border border-slate-150 py-1.5 rounded-xl my-1.5 leading-snug">
                             "{selectedLks?.name}"
-                            <div className="text-[7.5px] font-sans text-slate-400 font-bold uppercase mt-1">
+                            <div className="text-[7px] font-sans text-slate-400 font-bold uppercase mt-0.5">
                               Wilayah Kerja: {selectedLks?.workScope || "Kabupaten"}
                             </div>
                           </h2>
@@ -666,11 +703,11 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                             Menyatakan bahwa lembaga tersebut telah dievaluasi dan Memperoleh Peringkat Kelayakan:
                           </p>
                           
-                          <div className="bg-amber-500/10 border-2 border-amber-500 text-amber-800 rounded-xl p-3 max-w-xs mx-auto font-serif">
-                            <span className="text-xs sm:text-sm font-extrabold uppercase block tracking-wider">
-                              🎖️ {selectedLks?.accreditation || "TEKREDITASI A (SANGAT BAIK)"}
+                          <div className="bg-amber-500/10 border border-amber-500 text-amber-800 rounded-xl p-2.5 max-w-xs mx-auto font-serif">
+                            <span className="text-xs font-extrabold uppercase block tracking-wider">
+                              🎖️ {selectedLks?.accreditation || "TERAKREDITASI A (SANGAT BAIK)"}
                             </span>
-                            <span className="text-[8px] sm:text-[9px] text-slate-550 block font-sans mt-0.5 font-bold">
+                            <span className="text-[7.5px] font-sans text-slate-550 block font-bold mt-0.5">
                               Ditetapkan Sidang Tahun {selectedLks?.accreditationYear || "2024"}
                             </span>
                           </div>
@@ -682,10 +719,10 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                             ID-BALKS-REG-BLORA
                           </div>
                           
-                          <div className="text-right text-[8px] sm:text-[8.5px]">
+                          <div className="text-right text-[8px]">
                             Diterbitkan oleh BALKS Pusat<br/>
                             <strong>KETUA BADAN AKREDITASI</strong>
-                            <div className="h-6 w-16 mx-auto my-0.5 border border-dashed border-amber-300 flex items-center justify-center text-[6px] text-amber-700 font-bold uppercase">
+                            <div className="h-5 w-16 mx-auto my-0.5 border border-dashed border-amber-300 flex items-center justify-center text-[6px] text-amber-700 font-bold uppercase">
                               GOLD SEAL
                             </div>
                             <span className="font-bold underline text-slate-950">Prof. Dr. Ir. H. Syamsudin K.</span>
@@ -698,21 +735,34 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                 )}
               </div>
 
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-mono truncate max-w-[200px] sm:max-w-xs md:max-w-md" title={`google-drive://${settings.googleDriveRoot || "SILKS"}/${selectedLks?.name || "LKS"}/${previewDoc.docName}`}>
-                  Url-Target: google-drive://{settings.googleDriveRoot || "SILKS"}/{selectedLks?.name || "LKS"}/{previewDoc.docName}
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 text-xs shrink-0">
+                <span className="text-slate-400 font-mono text-[9px] sm:text-[11px] truncate max-w-full sm:max-w-xs md:max-w-md self-center" title={`google-drive://${settings.googleDriveRoot || "SILKS"}/${selectedLks?.name || "LKS"}/${previewDoc.docName}`}>
+                  Drive-Path: /{settings.googleDriveRoot || "SILKS"}/{selectedLks?.name || "LKS"}/{previewDoc.docName}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    showToast("success", "Unduh File", `File '${previewDoc.docName}' berhasil diunduh.`);
-                    setPreviewDoc(null);
-                  }}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg shadow-md cursor-pointer flex items-center gap-1.5"
-                >
-                  <HardDrive className="w-4 h-4 text-emerald-400" />
-                  Buka di Google Drive
-                </button>
+                
+                <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+                  {previewDoc.url && previewDoc.url !== "#" && (
+                    <a
+                      href={previewDoc.url}
+                      download={previewDoc.docName}
+                      className="whitespace-nowrap px-3 px-3.5 py-2 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-200 bg-white transition-colors flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                    >
+                      Unduh Berkas
+                    </a>
+                  )}
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast("success", "Sinkronisasi Berhasil", `File '${previewDoc.docName}' berhasil diverifikasi & dimuat di Google Drive.`);
+                      setPreviewDoc(null);
+                    }}
+                    className="whitespace-nowrap px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <HardDrive className="w-4 h-4 text-emerald-400" />
+                    Simulasi Akses Drive
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
