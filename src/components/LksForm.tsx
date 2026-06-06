@@ -556,8 +556,8 @@ export const LksForm: React.FC<LksFormProps> = ({
             <div className="max-w-2xl">
               <h4 className="font-bold text-slate-500 text-xs uppercase tracking-wider mb-2">Riwayat Daftar Penerimaan Bantuan</h4>
               {supportHistory.length > 0 ? (
-                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                  <table className="w-full text-left text-xs border-collapse">
+                <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-sm">
+                  <table className="w-full text-left text-xs border-collapse min-w-[500px]">
                     <thead>
                       <tr className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700">
                         <th className="p-3">Tahun</th>

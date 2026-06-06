@@ -1453,8 +1453,8 @@ function SiLksBloraApp() {
                 )}
 
                 {/* Primary Registers Data Grid */}
-                <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm">
-                  <table className="w-full text-left text-xs border-collapse">
+                <div className="border border-slate-150 rounded-xl overflow-x-auto shadow-sm">
+                  <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
                         <th className="p-4 w-12 text-center">
@@ -1686,8 +1686,8 @@ function SiLksBloraApp() {
                 <div className="space-y-4">
                   <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-widest font-display">Tabel Rekap PM Asli Per LKS</h4>
                   
-                  <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-150 rounded-xl overflow-x-auto shadow-sm">
+                    <table className="w-full text-left text-xs border-collapse min-w-[750px]">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
                           <th className="p-4">Nama LKS (Klik untuk ekspansi)</th>
@@ -1785,7 +1785,8 @@ function SiLksBloraApp() {
                                         </div>
 
                                         {/* Nested detailed data table */}
-                                        <table className="w-full text-left text-[11px] border border-slate-150">
+                                        <div className="overflow-x-auto w-full border border-slate-150 rounded-xl">
+                                          <table className="w-full text-left text-[11px] border-collapse min-w-[700px]">
                                           <thead>
                                             <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-500">
                                               <th className="p-2 text-center w-10">
@@ -1857,6 +1858,7 @@ function SiLksBloraApp() {
                                             )}
                                           </tbody>
                                         </table>
+                                      </div>
 
                                       </div>
                                     </td>
@@ -1984,8 +1986,8 @@ function SiLksBloraApp() {
             </div>
 
             {/* Result Table list */}
-            <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="border border-slate-150 rounded-xl overflow-x-auto shadow-sm">
+              <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold">
                     <th className="p-3">Nama PM</th>
@@ -2274,8 +2276,8 @@ function SiLksBloraApp() {
               </p>
 
               {/* Table listing columns and descriptions */}
-              <div className="border border-slate-150 rounded-2xl overflow-y-auto max-h-[40vh]">
-                <table className="w-full text-left text-[11px] border-collapse">
+              <div className="border border-slate-150 rounded-2xl overflow-auto max-h-[40vh]">
+                <table className="w-full text-left text-[11px] border-collapse min-w-[550px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-150 text-slate-500 font-bold sticky top-0">
                       <th className="p-3 pl-4">No</th>
@@ -2494,8 +2496,8 @@ LKS Harapan Mulia,Blora,Mlangsen,Jl. Pemuda No. 12,08123456789,2021-08-17,AKTIF,
               </p>
 
               {/* Table listing columns and descriptions */}
-              <div className="border border-slate-150 rounded-2xl overflow-y-auto max-h-[35vh]">
-                <table className="w-full text-left text-[11px] border-collapse">
+              <div className="border border-slate-150 rounded-2xl overflow-auto max-h-[35vh]">
+                <table className="w-full text-left text-[11px] border-collapse min-w-[550px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-150 text-slate-500 font-bold sticky top-0">
                       <th className="p-3 pl-4">No</th>
