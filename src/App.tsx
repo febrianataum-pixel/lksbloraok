@@ -38,7 +38,7 @@ import {
   Building2, Users, FileCheck2, Search, FileHeart, Settings, 
   MapPin, Phone, Printer, Edit2, Trash2, Globe, Heart, 
   FileUp, FileDown, Plus, HelpCircle, Users2, AlertTriangle, ChevronRight, Check,
-  Bell, X
+  Bell, X, Menu
 } from "lucide-react";
 
 export default function App() {
@@ -54,6 +54,27 @@ function SiLksBloraApp() {
 
   // Selected Active Side-Menu Tab
   const [activeTab, setActiveTab] = useState("dashboard");
+
+  // Mobile navigation drawer state
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Real-Time System UTC Clock State
+  const [systemTime, setSystemTime] = useState("2026-06-05 03:10");
+
+  useEffect(() => {
+    const updateUTCClock = () => {
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(now.getUTCDate()).padStart(2, "0");
+      const hours = String(now.getUTCHours()).padStart(2, "0");
+      const minutes = String(now.getUTCMinutes()).padStart(2, "0");
+      setSystemTime(`${year}-${month}-${day} ${hours}:${minutes}`);
+    };
+    updateUTCClock();
+    const clockInterval = setInterval(updateUTCClock, 60000);
+    return () => clearInterval(clockInterval);
+  }, []);
 
   // Notification badge states
   const [unreadCount, setUnreadCount] = useState(3);
@@ -997,6 +1018,115 @@ function SiLksBloraApp() {
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 text-slate-800 font-sans antialiased overflow-x-hidden">
       
+      {/* Mobile Sticky Top Header Bar */}
+      <div className="md:hidden flex items-center justify-between bg-white border-b border-slate-200 text-slate-800 px-3/2 sm:px-4 py-2 sticky top-0 z-40 shadow-sm shrink-0">
+        {/* LEFT ASPECT: Hamburger Menu Button */}
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="p-2 hover:bg-slate-100 active:scale-95 text-slate-600 rounded-xl transition-all cursor-pointer focus:outline-none shrink-0"
+          title="Menu Navigasi"
+        >
+          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+
+        {/* MID ASPECT: Brand Logo, Name & Title */}
+        <div className="flex-1 flex items-center gap-2 ml-1 min-w-0">
+          <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center shrink-0 shadow-sm border border-slate-100 bg-white">
+            <img src={settings.appLogo} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          </div>
+          <div className="truncate">
+            <h1 className="text-[11px] font-black uppercase tracking-wider text-slate-800 leading-none font-display">SiLKS Blora</h1>
+            <p className="text-[8px] text-slate-400 font-mono tracking-normal leading-none mt-0.5">Kab. Blora</p>
+          </div>
+        </div>
+
+        {/* RIGHT ASPECT: Clock & Notifications */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Modern live updated UTC clock for mobile */}
+          <div className="flex items-center gap-1.5 bg-indigo-50/70 border border-indigo-100 px-2 py-1 rounded-xl text-indigo-700 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse shrink-0"></span>
+            <span className="text-[10px] font-extrabold font-mono leading-none">{systemTime.split(" ")[1] || "03:10"}</span>
+          </div>
+
+          {/* Compact Mobile Notification Selector */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowNotificationDropdown(!showNotificationDropdown);
+                setUnreadCount(0);
+              }}
+              className="w-9 h-9 bg-white border border-slate-200 text-slate-800 rounded-xl flex items-center justify-center relative shadow-sm hover:bg-slate-50 active:scale-95 transition-all focus:outline-none cursor-pointer"
+              title="Notifikasi"
+            >
+              <Bell className="w-4 h-4 text-slate-600 shrink-0" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-rose-500 text-white font-black text-[8px] rounded-full w-4 h-4 flex items-center justify-center border border-white shadow-sm leading-none">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown Menu for Mobile */}
+            {showNotificationDropdown && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowNotificationDropdown(false)}
+                />
+                <div className="absolute right-0 mt-3 w-[calc(100vw-24px)] min-[350px]:w-80 bg-white border border-slate-200 rounded-3xl shadow-xl shadow-slate-200/50 z-50 overflow-hidden font-sans">
+                  {/* Header */}
+                  <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800 leading-none">Pemberitahuan Perubahan</h4>
+                      <p className="text-[9px] text-slate-400 mt-1 font-medium font-mono">Blora LKS Live State</p>
+                    </div>
+                    <span className="text-[9px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded-lg font-bold">
+                      Real-Time
+                    </span>
+                  </div>
+
+                  {/* Scrollable list of notifications */}
+                  <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+                    {peerNotifications.length === 0 ? (
+                      <div className="p-6 text-center text-slate-400">
+                        <Bell className="w-6 h-6 text-slate-200 mx-auto mb-2 animate-bounce" />
+                        <p className="text-[11px] font-medium">Tidak ada pemberitahuan baru.</p>
+                      </div>
+                    ) : (
+                      peerNotifications.map((notif) => (
+                        <div key={notif.id} className="p-4 hover:bg-slate-50/60 transition-colors flex items-start gap-3">
+                          <div className={`w-2 h-2 mt-1.5 rounded-full ${notif.avatarColor} shrink-0`} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-bold text-slate-800 leading-snug">{notif.user}</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5 leading-normal font-sans">{notif.action}</p>
+                            <p className="text-[8px] text-slate-400 font-mono mt-1 font-semibold">{notif.time}</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Footer bar */}
+                  <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-center">
+                    <button
+                      onClick={async () => {
+                        await clearAllNotifications();
+                        setUnreadCount(0);
+                        setShowNotificationDropdown(false);
+                        showToast("success", "Notifikasi Dihapus", "Seluruh riwayat notifikasi live telah dihapus.");
+                      }}
+                      className="text-[11px] font-bold text-rose-600 hover:text-rose-800 transition-colors cursor-pointer block w-full py-1"
+                    >
+                      Hapus Notifikasi
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Dynamic Print Preview Overlay View */}
       {printDocument && (
         <PrintPreview
@@ -1022,6 +1152,8 @@ function SiLksBloraApp() {
           }
         }}
         settingsLogo={settings.appLogo}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
       />
 
       {/* 2. Main Content Canvas */}
@@ -1050,7 +1182,7 @@ function SiLksBloraApp() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 md:-mt-2">
+          <div className="hidden md:flex items-center gap-3 md:-mt-2">
             {/* Notification Bell Button */}
             <div className="relative">
               <button
@@ -1135,7 +1267,7 @@ function SiLksBloraApp() {
               <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></div>
               <div>
                 <span className="text-[9px] font-mono text-slate-500 font-bold uppercase block tracking-wider leading-none">Waktu Sistem UTC</span>
-                <span className="text-xs font-bold font-mono text-indigo-700 block mt-0.5">2026-06-05 03:10</span>
+                <span className="text-xs font-bold font-mono text-indigo-700 block mt-0.5">{systemTime}</span>
               </div>
             </div>
           </div>
