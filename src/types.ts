@@ -78,10 +78,12 @@ export interface Beneficiary {
   birthPlace: string;
   birthDate: string;
   gender: "L" | "P";
+  kabupaten?: string;
   district: string;
   village: string;
   category: "Dalam" | "Luar";
   notes: string;
+  status?: "Aktif" | "Terminasi";
   createdAt?: string;
   updatedAt?: string;
 }

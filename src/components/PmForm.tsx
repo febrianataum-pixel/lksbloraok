@@ -2,7 +2,17 @@ import React, { useState, useEffect } from "react";
 import { Beneficiary, LKS, BLORA_DISTRICTS } from "../types";
 import { useNotifications } from "./NotificationManager";
 import { calculateAge } from "../utils/exporters";
-import { Users, Building, FileText, Calendar, Search, MapPin, Save, ArrowLeft, Heart } from "lucide-react";
+import {
+  Users,
+  Building,
+  FileText,
+  Calendar,
+  Search,
+  MapPin,
+  Save,
+  ArrowLeft,
+  Heart,
+} from "lucide-react";
 
 interface PmFormProps {
   initialData?: Beneficiary | null;
@@ -15,7 +25,7 @@ export const PmForm: React.FC<PmFormProps> = ({
   initialData,
   lksList,
   onSave,
-  onCancel
+  onCancel,
 }) => {
   const { showToast } = useNotifications();
 
@@ -32,11 +42,16 @@ export const PmForm: React.FC<PmFormProps> = ({
   const [birthPlace, setBirthPlace] = useState(initialData?.birthPlace || "");
   const [birthDate, setBirthDate] = useState(initialData?.birthDate || "");
   const [gender, setGender] = useState<"L" | "P">(initialData?.gender || "L");
-  const [kabupaten, setKabupaten] = useState(initialData?.district ? "Blora" : "Blora"); // Always "Blora" or as preset
+  const [kabupaten, setKabupaten] = useState(initialData?.kabupaten || "Blora");
   const [district, setDistrict] = useState(initialData?.district || "Blora");
   const [village, setVillage] = useState(initialData?.village || "");
-  const [category, setCategory] = useState<"Dalam" | "Luar">(initialData?.category || "Dalam");
+  const [category, setCategory] = useState<"Dalam" | "Luar">(
+    initialData?.category || "Dalam",
+  );
   const [notes, setNotes] = useState(initialData?.notes || "");
+  const [status, setStatus] = useState<"Aktif" | "Terminasi">(
+    initialData?.status || "Aktif",
+  );
 
   // Real-time Age tracking
   const [computedAge, setComputedAge] = useState(0);
@@ -58,28 +73,45 @@ export const PmForm: React.FC<PmFormProps> = ({
     setShowLksDropdown(false);
   };
 
-  const filteredLks = lksList.filter(lks => 
-    lks.name.toLowerCase().includes(lksSearchQuery.toLowerCase()) ||
-    lks.district.toLowerCase().includes(lksSearchQuery.toLowerCase())
+  const filteredLks = lksList.filter(
+    (lks) =>
+      lks.name.toLowerCase().includes(lksSearchQuery.toLowerCase()) ||
+      lks.district.toLowerCase().includes(lksSearchQuery.toLowerCase()),
   );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
-      showToast("error", "Simpan Gagal", "Nama Penerima Manfaat (PM) wajib diisi.");
+      showToast(
+        "error",
+        "Simpan Gagal",
+        "Nama Penerima Manfaat (PM) wajib diisi.",
+      );
       return;
     }
     if (!lksId) {
-      showToast("error", "Simpan Gagal", "Lembaga LKS pembina PM wajib dipilih.");
+      showToast(
+        "error",
+        "Simpan Gagal",
+        "Lembaga LKS pembina PM wajib dipilih.",
+      );
       return;
     }
     if (nik.length !== 16 || isNaN(Number(nik))) {
-      showToast("error", "Simpan Gagal", "Nomor NIK harus tepat 16 digit angka.");
+      showToast(
+        "error",
+        "Simpan Gagal",
+        "Nomor NIK harus tepat 16 digit angka.",
+      );
       return;
     }
     if (kk.length !== 16 || isNaN(Number(kk))) {
-      showToast("error", "Simpan Gagal", "Nomor Kartu Keluarga (KK) harus tepat 16 digit angka.");
+      showToast(
+        "error",
+        "Simpan Gagal",
+        "Nomor Kartu Keluarga (KK) harus tepat 16 digit angka.",
+      );
       return;
     }
     if (!birthDate) {
@@ -97,10 +129,12 @@ export const PmForm: React.FC<PmFormProps> = ({
       birthPlace: birthPlace.trim(),
       birthDate,
       gender,
-      district,
+      kabupaten: kabupaten.trim(),
+      district: district.trim(),
       village: village.trim(),
       category,
-      notes: notes.trim()
+      notes: notes.trim(),
+      status,
     };
 
     onSave(compiledPm);
@@ -120,9 +154,13 @@ export const PmForm: React.FC<PmFormProps> = ({
           </button>
           <div>
             <h3 className="text-md font-bold text-slate-900 font-display">
-              {initialData ? "Edit Penerima Manfaat (PM)" : "Registrasi Penerima Manfaat Baru (PM)"}
+              {initialData
+                ? "Edit Penerima Manfaat (PM)"
+                : "Registrasi Penerima Manfaat Baru (PM)"}
             </h3>
-            <p className="text-xs text-slate-400 font-medium">Isi data identitas diri PM untuk dipasangkan ke LKS terkait.</p>
+            <p className="text-xs text-slate-400 font-medium">
+              Isi data identitas diri PM untuk dipasangkan ke LKS terkait.
+            </p>
           </div>
         </div>
         <button
@@ -134,8 +172,10 @@ export const PmForm: React.FC<PmFormProps> = ({
         </button>
       </div>
 
-      <form onSubmit={(e) => e.preventDefault()} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-        
+      <form
+        onSubmit={(e) => e.preventDefault()}
+        className="p-6 space-y-4 max-h-[70vh] overflow-y-auto"
+      >
         {/* Searchable LKS Selector */}
         <div className="relative">
           <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">
@@ -165,7 +205,7 @@ export const PmForm: React.FC<PmFormProps> = ({
           {showLksDropdown && (
             <div className="absolute left-0 right-0 mt-1.5 max-h-56 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-xl z-20">
               {filteredLks.length > 0 ? (
-                filteredLks.map(lks => (
+                filteredLks.map((lks) => (
                   <button
                     key={lks.id}
                     type="button"
@@ -174,7 +214,9 @@ export const PmForm: React.FC<PmFormProps> = ({
                   >
                     <div>
                       <p className="font-bold text-slate-900">{lks.name}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 font-mono">ID: {lks.id} | Kecamatan: {lks.district}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                        ID: {lks.id} | Kecamatan: {lks.district}
+                      </p>
                     </div>
                     <span className="text-[10.5px] font-semibold text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded">
                       {lks.district}
@@ -193,7 +235,8 @@ export const PmForm: React.FC<PmFormProps> = ({
         {/* PM Name */}
         <div>
           <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">
-            Nama Lengkap Penerima Manfaat <span className="text-rose-500">*</span>
+            Nama Lengkap Penerima Manfaat{" "}
+            <span className="text-rose-500">*</span>
           </label>
           <div className="relative">
             <Users className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
@@ -212,7 +255,8 @@ export const PmForm: React.FC<PmFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">
-              Nomor Induk Kependudukan (NIK) <span className="text-rose-500">*</span>
+              Nomor Induk Kependudukan (NIK){" "}
+              <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -258,7 +302,8 @@ export const PmForm: React.FC<PmFormProps> = ({
 
           <div>
             <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">
-              Tanggal Lahir (DD-MM-YYYY) <span className="text-rose-500">*</span>
+              Tanggal Lahir (DD-MM-YYYY){" "}
+              <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <Calendar className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
@@ -277,8 +322,15 @@ export const PmForm: React.FC<PmFormProps> = ({
               Usia (Otomatis Dihitung)
             </label>
             <div className="px-3.5 py-2 bg-slate-900 border border-slate-950 rounded-lg text-white font-mono flex items-center justify-between shadow-inner">
-              <span className="text-[10px] font-bold text-slate-400">AGE VALUE</span>
-              <span className="text-sm font-extrabold text-orange-400">{computedAge} <span className="text-[9px] font-semibold text-slate-300">Tahun</span></span>
+              <span className="text-[10px] font-bold text-slate-400">
+                AGE VALUE
+              </span>
+              <span className="text-sm font-extrabold text-orange-400">
+                {computedAge}{" "}
+                <span className="text-[9px] font-semibold text-slate-300">
+                  Tahun
+                </span>
+              </span>
             </div>
           </div>
         </div>
@@ -315,62 +367,101 @@ export const PmForm: React.FC<PmFormProps> = ({
 
           <div>
             <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">
-              Kabupaten Domisili
+              Kabupaten Asal <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={kabupaten}
-              className="w-full px-3.5 py-2.5 text-xs font-extrabold rounded-lg bg-slate-100 border border-slate-200 text-slate-500 cursor-not-allowed"
-              disabled
+              onChange={(e) => setKabupaten(e.target.value)}
+              list="kabupaten-list"
+              className="w-full px-3.5 py-2.5 text-xs font-medium rounded-lg bg-slate-50 border border-slate-200 text-slate-800 shadow-sm focus:border-slate-400 focus:bg-white outline-none"
+              placeholder="cth: Blora"
+              required
             />
+            <datalist id="kabupaten-list">
+              <option value="Blora" />
+              <option value="Rembang" />
+              <option value="Grobogan" />
+              <option value="Tuban" />
+              <option value="Bojonegoro" />
+              <option value="Semarang" />
+              <option value="Pati" />
+              <option value="Kudus" />
+            </datalist>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">
-              Kecamatan Domisili <span className="text-rose-500">*</span>
+              Kecamatan Asal <span className="text-rose-500">*</span>
             </label>
-            <select
+            <input
+              type="text"
               value={district}
               onChange={(e) => setDistrict(e.target.value)}
-              className="w-full text-xs font-semibold rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3 py-2.5 outline-none hover:bg-slate-100 cursor-pointer"
-            >
-              {BLORA_DISTRICTS.map(d => (
-                <option key={d.name} value={d.name}>{d.name}</option>
+              list="districts-list"
+              className="w-full px-3.5 py-2.5 text-xs font-medium rounded-lg bg-slate-50 border border-slate-200 text-slate-800 shadow-sm focus:border-slate-400 focus:bg-white outline-none"
+              placeholder="Ketik nama kecamatan..."
+              required
+            />
+            <datalist id="districts-list">
+              {BLORA_DISTRICTS.map((d) => (
+                <option key={d.name} value={d.name}>
+                  {d.name}
+                </option>
               ))}
-            </select>
+            </datalist>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">
-              Desa / Kelurahan Domisili <span className="text-rose-500">*</span>
+              Desa / Kelurahan Asal <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               value={village}
               onChange={(e) => setVillage(e.target.value)}
               className="w-full px-3.5 py-2.5 text-xs font-medium rounded-lg bg-slate-50 border border-slate-200 text-slate-800 shadow-sm focus:border-slate-400 focus:bg-white outline-none"
-              placeholder="Desa tempat tinggal saat ini..."
+              placeholder="Desa tempat tinggal asal..."
               required
             />
           </div>
         </div>
 
-        {/* Notes (Keterangan) */}
-        <div className="border-t border-slate-100 pt-4">
-          <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">
-            Rincian Kondisi / Keterangan Kebutuhan PM
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={4}
-            className="w-full text-xs font-medium rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm focus:border-slate-400 focus:bg-white outline-none leading-relaxed"
-            placeholder="Tuliskan catatan bantuan yang dibutuhkan, keadaan ekonomi keluarga, riwayat sakit disabilitas, atau program perlindungan yg tepat..."
-          />
-        </div>
+        {/* Status & Keterangan */}
+        <div className="border-t border-slate-100 pt-4 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5 animate-fade-in">
+              Status PM / Pembinaan
+            </label>
+            <select
+              value={status}
+              onChange={(e) =>
+                setStatus(e.target.value as "Aktif" | "Terminasi")
+              }
+              className="w-full text-xs font-semibold rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 outline-none hover:bg-slate-100 cursor-pointer shadow-sm transition-colors"
+            >
+              <option value="Aktif">Aktif (Dalam Pembinaan LKS)</option>
+              <option value="Terminasi">
+                Terminasi (Selesai Dibina / Keluar)
+              </option>
+            </select>
+          </div>
 
+          <div>
+            <label className="block text-xs font-bold text-slate-500 font-display uppercase tracking-wider mb-1.5">
+              Keterangan
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              className="w-full text-xs font-medium rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm focus:border-slate-400 focus:bg-white outline-none leading-relaxed transition-all"
+              placeholder="Tuliskan catatan bantuan, riwayat, atau alasan terminasi..."
+            />
+          </div>
+        </div>
       </form>
     </div>
   );
