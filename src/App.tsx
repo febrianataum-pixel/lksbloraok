@@ -46,6 +46,10 @@ import {
   handleFirestoreError,
   OperationType,
   loginWithGoogle,
+  loginAnonymously,
+  getActiveFirebaseConfig,
+  saveCustomFirebaseConfig,
+  clearCustomFirebaseConfig,
 } from "./firebase";
 import {
   collection,
@@ -106,6 +110,20 @@ function SiLksBloraApp() {
 
   // Selected Active Side-Menu Tab
   const [activeTab, setActiveTab] = useState("dashboard");
+
+  // Form State for custom Firebase API Keys
+  const [customFbConfig, setCustomFbConfig] = useState(() => {
+    const current = getActiveFirebaseConfig();
+    return {
+      apiKey: current.apiKey || "",
+      authDomain: current.authDomain || "",
+      projectId: current.projectId || "",
+      firestoreDatabaseId: current.firestoreDatabaseId || "",
+      storageBucket: current.storageBucket || "",
+      messagingSenderId: current.messagingSenderId || "",
+      appId: current.appId || "",
+    };
+  });
 
   // Mobile navigation drawer state
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -1731,6 +1749,29 @@ function SiLksBloraApp() {
             "Menjelajahi data Kabupaten Blora dalam mode demo lokal.",
           );
         }}
+        onAnonymousSignIn={async () => {
+          try {
+            const user = await loginAnonymously();
+            setCurrentUser(user);
+            showToast(
+              "success",
+              "Koneksi Cloud SiLKS Aktif",
+              "Berhasil terhubung ke database cloud Firestore secara real-time tanpa popup browser!",
+            );
+            addNewPeerNotification(
+              "Sesi Awan SiLKS",
+              "baru saja menghubungkan database awan via Sesi Bebas Popup",
+              "bg-emerald-500",
+            );
+          } catch (error) {
+            console.error("Anonymous login error:", error);
+            showToast(
+              "error",
+              "Layanan Cloud Bermasalah",
+              "Gagal menghubungi database Firebase. Silakan periksa koneksi internet Anda atau konfigurasikan API Key Anda sendiri."
+            );
+          }
+        }}
         onGoogleSignIn={async () => {
           try {
             const user = await loginWithGoogle();
@@ -1746,25 +1787,41 @@ function SiLksBloraApp() {
               "bg-indigo-600",
             );
           } catch (e) {
-            console.error("Popup handler failed: ", e);
-            // Visual fallback for sandbox safety
-            const fallbackUser = {
-              email: "febrianataum@gmail.com",
-              displayName: "Febrian Ataum Dinsos",
-              uid: "mock-uid-005",
-              isDemo: true,
-            };
-            setCurrentUser(fallbackUser);
-            showToast(
-              "info",
-              "Popup Google Terblokir - Masuk Offline",
-              "Browser memblokir popup Google Sign-In. Sesi masuk secara offline dan otomatis menyimpan perubahan ke penyimpanan lokal Anda.",
-            );
-            addNewPeerNotification(
-              fallbackUser.displayName,
-              "baru saja masuk ke dalam sistem (Login)",
-              "bg-indigo-600",
-            );
+            console.error("Popup handler failed, trying anonymous fallback: ", e);
+            try {
+              const userAnon = await loginAnonymously();
+              setCurrentUser(userAnon);
+              showToast(
+                "success",
+                "Masuk Cloud Otomatis (Bypass)",
+                "Popup Google diblokir browser. Sistem mengalihkan Anda ke sesi cloud anonim secara aman agar sinkronisasi real-time tetap berjalan!",
+              );
+              addNewPeerNotification(
+                "Sesi Sandbox SiLKS",
+                "mengaktifkan konektivitas real-time cloud setelah kegagalan popup",
+                "bg-emerald-500",
+              );
+            } catch (anonErr) {
+              console.error("Anonymous fallback also failed: ", anonErr);
+              // Visual fallback for sandbox safety
+              const fallbackUser = {
+                email: "febrianataum@gmail.com",
+                displayName: "Febrian Ataum Dinsos",
+                uid: "mock-uid-005",
+                isDemo: true,
+              };
+              setCurrentUser(fallbackUser);
+              showToast(
+                "info",
+                "Mode Offline Diaktifkan",
+                "Gagal menghubungkan cloud. Sesi Anda beralih ke penyimpanan lokal (localStorage) dengan aman.",
+              );
+              addNewPeerNotification(
+                fallbackUser.displayName,
+                "baru saja masuk ke dalam sistem secara offline",
+                "bg-indigo-600",
+              );
+            }
           }
         }}
       />
@@ -3746,6 +3803,199 @@ function SiLksBloraApp() {
                   }
                 }}
               />
+            </div>
+
+            {/* Firebase Custom Integration Card */}
+            <div className="bg-white rounded-3xl border border-slate-150 shadow-sm p-6 space-y-6">
+              <div className="border-b border-slate-100 pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-extrabold text-sm text-slate-900 font-display">
+                      Integrasi Database Firebase & API Key Mandiri
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-normal font-medium">
+                      Modifikasi data secara real-time langsung ke database Firebase / Firestore Anda sendiri dengan memasukkan kredensial proyek di bawah ini.
+                    </p>
+                  </div>
+                  <div>
+                    {currentUser && !currentUser.isDemo ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-750 font-bold border border-emerald-100 rounded-full text-[10px] font-mono">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        Awan Sinkron Real-Time
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 font-bold border border-amber-100 rounded-full text-[10px] font-mono">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                        Offline (Penyimpanan Lokal)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Firebase API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={customFbConfig.apiKey}
+                    onChange={(e) =>
+                      setCustomFbConfig((prev) => ({
+                        ...prev,
+                        apiKey: e.target.value,
+                      }))
+                    }
+                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
+                    placeholder="AIzaSy..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Project ID
+                  </label>
+                  <input
+                    type="text"
+                    value={customFbConfig.projectId}
+                    onChange={(e) =>
+                      setCustomFbConfig((prev) => ({
+                        ...prev,
+                        projectId: e.target.value,
+                      }))
+                    }
+                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
+                    placeholder="my-firebase-project-id"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Database ID (Firestore Database ID)
+                  </label>
+                  <input
+                    type="text"
+                    value={customFbConfig.firestoreDatabaseId}
+                    onChange={(e) =>
+                      setCustomFbConfig((prev) => ({
+                        ...prev,
+                        firestoreDatabaseId: e.target.value,
+                      }))
+                    }
+                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
+                    placeholder="(default) atau custom-db-id"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Auth Domain
+                  </label>
+                  <input
+                    type="text"
+                    value={customFbConfig.authDomain}
+                    onChange={(e) =>
+                      setCustomFbConfig((prev) => ({
+                        ...prev,
+                        authDomain: e.target.value,
+                      }))
+                    }
+                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
+                    placeholder="project-id.firebaseapp.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    App ID
+                  </label>
+                  <input
+                    type="text"
+                    value={customFbConfig.appId}
+                    onChange={(e) =>
+                      setCustomFbConfig((prev) => ({
+                        ...prev,
+                        appId: e.target.value,
+                      }))
+                    }
+                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
+                    placeholder="1:12345678:web:abcdef..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Storage Bucket
+                  </label>
+                  <input
+                    type="text"
+                    value={customFbConfig.storageBucket}
+                    onChange={(e) =>
+                      setCustomFbConfig((prev) => ({
+                        ...prev,
+                        storageBucket: e.target.value,
+                      }))
+                    }
+                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
+                    placeholder="project-id.appspot.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Messaging Sender ID
+                  </label>
+                  <input
+                    type="text"
+                    value={customFbConfig.messagingSenderId}
+                    onChange={(e) =>
+                      setCustomFbConfig((prev) => ({
+                        ...prev,
+                        messagingSenderId: e.target.value,
+                      }))
+                    }
+                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
+                    placeholder="9876543210..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ok = window.confirm("Apakah Anda yakin ingin menghapus API Key kustom dan kembali menggunakan database Firebase bawaan sandbox?");
+                    if (ok) {
+                      clearCustomFirebaseConfig();
+                      showToast("success", "Kembali ke Setelan Default", "Kunci kustom dihapus. Membuka koneksi cloud default...");
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 1000);
+                    }
+                  }}
+                  className="w-full sm:w-auto px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer text-center"
+                >
+                  Kembalikan ke Sasis Default
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!customFbConfig.apiKey || !customFbConfig.projectId) {
+                      window.alert("Mohon masukkan minimal API Key dan Project ID terlebih dahulu!");
+                      return;
+                    }
+                    saveCustomFirebaseConfig(customFbConfig);
+                    showToast("success", "Firestore Kustom Disimpan", "Menghubungkan ke proyek Firebase kustom Anda secara instan...");
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 1000);
+                  }}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs text-center rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                >
+                  Terapkan Database Kustom
+                </button>
+              </div>
             </div>
           </div>
         )}

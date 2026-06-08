@@ -7,12 +7,14 @@ import { motion } from "motion/react";
 
 interface LoginScreenProps {
   onGoogleSignIn: () => void;
+  onAnonymousSignIn: () => void;
   onEnterAsGuest: () => void;
   logoUrl: string;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onGoogleSignIn,
+  onAnonymousSignIn,
   onEnterAsGuest,
   logoUrl
 }) => {
@@ -22,6 +24,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setLoading(true);
     try {
       await onGoogleSignIn();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnonymousLogin = async () => {
+    setLoading(true);
+    try {
+      await onAnonymousSignIn();
     } finally {
       setLoading(false);
     }
@@ -147,6 +158,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <LogIn className="w-4 h-4" />
                 )}
                 <span>Masuk dengan Google</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleAnonymousLogin}
+                disabled={loading}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-xs rounded-2xl transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+              >
+                <CloudLightning className="w-4 h-4 text-emerald-100 animate-pulse" />
+                <span>Masuk ke Cloud Instan (Bebas Popup)</span>
               </button>
 
               <div className="relative py-2 flex items-center justify-center">
