@@ -156,6 +156,7 @@ function SiLksBloraApp() {
   // Authentication State
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isGuestSession, setIsGuestSession] = useState<boolean>(false);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
   // Set Static Page Title
   useEffect(() => {
@@ -190,25 +191,25 @@ function SiLksBloraApp() {
 
   useEffect(() => {
     currentLksListRef.current = lksList;
-    if (!currentUser) {
+    if (!isAuthLoading && (!currentUser || currentUser.isDemo)) {
       try {
         localStorage.setItem("silks_guest_lks", JSON.stringify(lksList));
       } catch (e) {
         console.error(e);
       }
     }
-  }, [lksList, currentUser]);
+  }, [lksList, isAuthLoading, currentUser]);
 
   useEffect(() => {
     currentBeneficiariesRef.current = beneficiaries;
-    if (!currentUser) {
+    if (!isAuthLoading && (!currentUser || currentUser.isDemo)) {
       try {
         localStorage.setItem("silks_guest_beneficiaries", JSON.stringify(beneficiaries));
       } catch (e) {
         console.error(e);
       }
     }
-  }, [beneficiaries, currentUser]);
+  }, [beneficiaries, isAuthLoading, currentUser]);
 
   // Track if guest modified any local data before logging in
   useEffect(() => {
@@ -295,6 +296,7 @@ function SiLksBloraApp() {
     let unsubscribePm: (() => void) | null = null;
 
     const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
+      setIsAuthLoading(false);
       if (user) {
         setCurrentUser(user);
 
@@ -340,13 +342,31 @@ function SiLksBloraApp() {
                       updatedAt: new Date().toISOString(),
                     });
                     mergedCount++;
+                  } else {
+                    // Check if local version has modified properties compared to cloud
+                    const localClean = { ...localLks, ownerId: undefined, updatedAt: undefined };
+                    const cloudClean = { ...exists, ownerId: undefined, updatedAt: undefined };
+                    if (JSON.stringify(localClean) !== JSON.stringify(cloudClean)) {
+                      const updatedLks = {
+                        ...exists,
+                        ...localLks,
+                        ownerId: user.uid,
+                        updatedAt: new Date().toISOString(),
+                      };
+                      await setDoc(doc(db, "lks", localLks.id), updatedLks, { merge: true });
+                      const idx = mergedLks.findIndex((cl) => cl.id === localLks.id);
+                      if (idx !== -1) {
+                        mergedLks[idx] = updatedLks;
+                      }
+                      mergedCount++;
+                    }
                   }
                 }
                 if (mergedCount > 0) {
                   showToast(
                     "success",
                     "Sinkronisasi LKS Berhasil",
-                    `Berhasil mensinkronkan ${mergedCount} LKS dari sesi lokal Anda ke cloud Firestore.`,
+                    `Berhasil menyelaraskan ${mergedCount} pembaruan LKS dari sesi lokal Anda ke database cloud.`,
                   );
                 }
                 finalLksList = mergedLks;
@@ -388,6 +408,11 @@ function SiLksBloraApp() {
           }
         }, (error) => {
           console.error("LKS Realtime Sync Error:", error);
+          showToast(
+            "error",
+            "Error Berlangganan LKS",
+            "Koneksi sinkronisasi data LKS ke cloud dibatasi atau terputus."
+          );
         });
 
         // 3. Live stream Beneficiaries
@@ -412,28 +437,46 @@ function SiLksBloraApp() {
               }
             });
 
-            // Merge guest additions if active
+            // Merge guest additions/modifications if active
             if (hasPmMods) {
               try {
                 const cachedList = JSON.parse(cachedPmStr) as Beneficiary[];
                 const mergedPM = [...cloudPM];
                 let pmMergedCount = 0;
                 for (const localPm of cachedList) {
+                  if (mockIds.includes(localPm.id)) continue;
                   const exists = cloudPM.find((cp) => cp.id === localPm.id);
-                  if (!exists && !mockIds.includes(localPm.id)) {
+                  if (!exists) {
                     mergedPM.push(localPm);
                     await setDoc(doc(db, "beneficiaries", localPm.id), {
                       ...localPm,
                       updatedAt: new Date().toISOString(),
                     });
                     pmMergedCount++;
+                  } else {
+                    // Check if local version has modified properties compared to cloud
+                    const localClean = { ...localPm, updatedAt: undefined };
+                    const cloudClean = { ...exists, updatedAt: undefined };
+                    if (JSON.stringify(localClean) !== JSON.stringify(cloudClean)) {
+                      const updatedPm = {
+                        ...exists,
+                        ...localPm,
+                        updatedAt: new Date().toISOString(),
+                      };
+                      await setDoc(doc(db, "beneficiaries", localPm.id), updatedPm, { merge: true });
+                      const idx = mergedPM.findIndex((cp) => cp.id === localPm.id);
+                      if (idx !== -1) {
+                        mergedPM[idx] = updatedPm;
+                      }
+                      pmMergedCount++;
+                    }
                   }
                 }
                 if (pmMergedCount > 0) {
                   showToast(
                     "success",
                     "Sinkronisasi PM Berhasil",
-                    `Berhasil mensinkronkan ${pmMergedCount} Penerima Manfaat baru ke database cloud Anda.`,
+                    `Berhasil menyelaraskan ${pmMergedCount} Penerima Manfaat baru/pembaharuan ke database cloud Anda.`,
                   );
                 }
                 finalPmList = mergedPM;
@@ -470,6 +513,11 @@ function SiLksBloraApp() {
           }
         }, (error) => {
           console.error("PM Realtime Sync Error:", error);
+          showToast(
+            "error",
+            "Error Berlangganan PM",
+            "Koneksi sinkronisasi data Penerima Manfaat ke cloud dibatasi atau terputus."
+          );
         });
 
       } else {
@@ -480,13 +528,29 @@ function SiLksBloraApp() {
         if (unsubscribePm) { unsubscribePm(); unsubscribePm = null; }
 
         // Fallback to local datasets
-        setLksList(INITIAL_LKS_DATA);
-        setBeneficiaries(INITIAL_BENEFICIARIES);
-        setSettings(INITIAL_SETTINGS);
         try {
-          localStorage.removeItem("silks_guest_lks");
-          localStorage.removeItem("silks_guest_beneficiaries");
-        } catch (e) {}
+          const cachedLks = localStorage.getItem("silks_guest_lks");
+          if (cachedLks) {
+            setLksList(JSON.parse(cachedLks));
+          } else {
+            setLksList(INITIAL_LKS_DATA);
+          }
+        } catch (e) {
+          setLksList(INITIAL_LKS_DATA);
+        }
+
+        try {
+          const cachedPm = localStorage.getItem("silks_guest_beneficiaries");
+          if (cachedPm) {
+            setBeneficiaries(JSON.parse(cachedPm));
+          } else {
+            setBeneficiaries(INITIAL_BENEFICIARIES);
+          }
+        } catch (e) {
+          setBeneficiaries(INITIAL_BENEFICIARIES);
+        }
+
+        setSettings(INITIAL_SETTINGS);
       }
     });
 
@@ -1644,6 +1708,17 @@ function SiLksBloraApp() {
     }
   }, [lksList]);
 
+  if (isAuthLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm font-medium text-slate-500 font-mono">Memeriksa Sesi...</span>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentUser && !isGuestSession) {
     return (
       <LoginScreen
@@ -1677,12 +1752,13 @@ function SiLksBloraApp() {
               email: "febrianataum@gmail.com",
               displayName: "Febrian Ataum Dinsos",
               uid: "mock-uid-005",
+              isDemo: true,
             };
             setCurrentUser(fallbackUser);
             showToast(
-              "success",
-              "Masuk Berhasil",
-              "Sesi terhubung menggunakan otentikasi Google Drive.",
+              "info",
+              "Popup Google Terblokir - Masuk Offline",
+              "Browser memblokir popup Google Sign-In. Sesi masuk secara offline dan otomatis menyimpan perubahan ke penyimpanan lokal Anda.",
             );
             addNewPeerNotification(
               fallbackUser.displayName,
@@ -2678,12 +2754,13 @@ function SiLksBloraApp() {
                 const fallbackUser = {
                   email: "dinsos.pppa.blora@gmail.com",
                   displayName: "Dinsos PPPA Blora Admin",
+                  isDemo: true,
                 };
                 setCurrentUser(fallbackUser);
                 showToast(
-                  "success",
-                  "Drive Tersambung (Visual)",
-                  "Modul visual storage diaktifkan dalam mode sandboxed.",
+                  "info",
+                  "Google Drive Tersambung (Offline)",
+                  "Modul visual terhubung secara offline karena popup Google diblokir.",
                 );
                 addNewPeerNotification(
                   fallbackUser.displayName,
@@ -3653,12 +3730,13 @@ function SiLksBloraApp() {
                     const fallbackUser = {
                       email: "dinsos.pppa.blora@gmail.com",
                       displayName: "Dinsos PPPA Blora Admin",
+                      isDemo: true,
                     };
                     setCurrentUser(fallbackUser);
                     showToast(
-                      "success",
-                      "Drive Tersambung (Visual)",
-                      "Modul visual storage diaktifkan dalam mode sandboxed.",
+                      "info",
+                      "Google Drive Tersambung (Offline)",
+                      "Modul visual terhubung secara offline karena popup Google diblokir.",
                     );
                     addNewPeerNotification(
                       fallbackUser.displayName,

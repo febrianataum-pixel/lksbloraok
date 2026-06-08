@@ -3,6 +3,7 @@
   "appId": "1:558128204930:web:460d4537e97a735beaf89b",
   "apiKey": "AIzaSyCCLrbRdA-GO9xBfNjngAZsL6vAOQByjjs",
   "authDomain": "leafy-builder-371nt.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-7f777e67-47a2-4f4e-9ed4-f4a501a8a999",
   "storageBucket": "leafy-builder-371nt.firebasestorage.app",
   "messagingSenderId": "558128204930",
   "measurementId": ""
