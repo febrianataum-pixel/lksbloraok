@@ -163,10 +163,24 @@ function SiLksBloraApp() {
   }, []);
 
   // Core Database Collections
-  const [lksList, setLksList] = useState<LKS[]>(INITIAL_LKS_DATA);
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>(
-    INITIAL_BENEFICIARIES,
-  );
+  const [lksList, setLksList] = useState<LKS[]>(() => {
+    try {
+      const cached = localStorage.getItem("silks_guest_lks");
+      if (cached) return JSON.parse(cached);
+    } catch (e) {
+      console.error("Gagal memuat local storage LKS:", e);
+    }
+    return INITIAL_LKS_DATA;
+  });
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>(() => {
+    try {
+      const cached = localStorage.getItem("silks_guest_beneficiaries");
+      if (cached) return JSON.parse(cached);
+    } catch (e) {
+      console.error("Gagal memuat local storage PM:", e);
+    }
+    return INITIAL_BENEFICIARIES;
+  });
   const [settings, setSettings] = useState<DinsosSettings>(INITIAL_SETTINGS);
 
   // Track Guest session modifications to merge on login
@@ -176,14 +190,39 @@ function SiLksBloraApp() {
 
   useEffect(() => {
     currentLksListRef.current = lksList;
-  }, [lksList]);
+    if (!currentUser) {
+      try {
+        localStorage.setItem("silks_guest_lks", JSON.stringify(lksList));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [lksList, currentUser]);
 
   useEffect(() => {
     currentBeneficiariesRef.current = beneficiaries;
-  }, [beneficiaries]);
+    if (!currentUser) {
+      try {
+        localStorage.setItem("silks_guest_beneficiaries", JSON.stringify(beneficiaries));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [beneficiaries, currentUser]);
 
   // Track if guest modified any local data before logging in
   useEffect(() => {
+    try {
+      const cachedLks = localStorage.getItem("silks_guest_lks");
+      const cachedPm = localStorage.getItem("silks_guest_beneficiaries");
+      const isLksCustom = cachedLks && cachedLks !== JSON.stringify(INITIAL_LKS_DATA);
+      const isPmCustom = cachedPm && cachedPm !== JSON.stringify(INITIAL_BENEFICIARIES);
+      if (isLksCustom || isPmCustom) {
+        hasGuestModificationsRef.current = true;
+        return;
+      }
+    } catch (e) {}
+
     if (!currentUser) {
       const isLksCustom = JSON.stringify(lksList) !== JSON.stringify(INITIAL_LKS_DATA);
       const isPmCustom = JSON.stringify(beneficiaries) !== JSON.stringify(INITIAL_BENEFICIARIES);
@@ -274,6 +313,11 @@ function SiLksBloraApp() {
         // 2. Live stream LKS
         unsubscribeLks = onSnapshot(collection(db, "lks"), async (querySnap) => {
           let finalLksList = [...currentLksListRef.current];
+          
+          // Check if there are local LKS modifications saved in localStorage
+          const cachedLksStr = localStorage.getItem("silks_guest_lks");
+          const hasLksMods = cachedLksStr && cachedLksStr !== JSON.stringify(INITIAL_LKS_DATA);
+
           if (!querySnap.empty) {
             const cloudLks: LKS[] = [];
             querySnap.forEach((d) => {
@@ -281,36 +325,47 @@ function SiLksBloraApp() {
             });
 
             // Merge guest modifications if active
-            if (hasGuestModificationsRef.current) {
-              const mergedLks = [...cloudLks];
-              let mergedCount = 0;
-              for (const localLks of finalLksList) {
-                const exists = cloudLks.find((cl) => cl.id === localLks.id);
-                if (!exists) {
-                  mergedLks.push(localLks);
-                  await setDoc(doc(db, "lks", localLks.id), {
-                    ...localLks,
-                    ownerId: user.uid,
-                    updatedAt: new Date().toISOString(),
-                  });
-                  mergedCount++;
+            if (hasLksMods) {
+              try {
+                const cachedList = JSON.parse(cachedLksStr) as LKS[];
+                const mergedLks = [...cloudLks];
+                let mergedCount = 0;
+                for (const localLks of cachedList) {
+                  const exists = cloudLks.find((cl) => cl.id === localLks.id);
+                  if (!exists) {
+                    mergedLks.push(localLks);
+                    await setDoc(doc(db, "lks", localLks.id), {
+                      ...localLks,
+                      ownerId: user.uid,
+                      updatedAt: new Date().toISOString(),
+                    });
+                    mergedCount++;
+                  }
                 }
+                if (mergedCount > 0) {
+                  showToast(
+                    "success",
+                    "Sinkronisasi LKS Berhasil",
+                    `Berhasil mensinkronkan ${mergedCount} LKS dari sesi lokal Anda ke cloud Firestore.`,
+                  );
+                }
+                finalLksList = mergedLks;
+              } catch (e) {
+                console.error("Gagal sinkronisasi LKS:", e);
+                finalLksList = cloudLks;
               }
-              if (mergedCount > 0) {
-                showToast(
-                  "success",
-                  "Sinkronisasi Berhasil",
-                  `Berhasil mensinkronkan ${mergedCount} LKS dari sesi lokal Anda ke cloud Firestore.`,
-                );
-              }
-              finalLksList = mergedLks;
-              hasGuestModificationsRef.current = false;
+              localStorage.removeItem("silks_guest_lks");
             } else {
               finalLksList = cloudLks;
             }
             setLksList(finalLksList);
           } else {
             // Seed initial database
+            if (hasLksMods) {
+              try {
+                finalLksList = JSON.parse(cachedLksStr) as LKS[];
+              } catch (e) {}
+            }
             const batch = writeBatch(db);
             finalLksList.forEach((lksDoc) => {
               const lksRef = doc(db, "lks", lksDoc.id);
@@ -322,13 +377,13 @@ function SiLksBloraApp() {
             });
             await batch.commit();
             setLksList(finalLksList);
-            if (hasGuestModificationsRef.current) {
+            localStorage.removeItem("silks_guest_lks");
+            if (hasLksMods) {
               showToast(
                 "success",
                 "Sesi Disimpan ke Cloud",
                 "Data pendaftaran LKS sesi lokal berhasil diunggah ke database cloud Firestore Anda.",
               );
-              hasGuestModificationsRef.current = false;
             }
           }
         }, (error) => {
@@ -337,8 +392,12 @@ function SiLksBloraApp() {
 
         // 3. Live stream Beneficiaries
         unsubscribePm = onSnapshot(collection(db, "beneficiaries"), async (querySnap) => {
-          let finalPmList = [...currentBeneficiariesRef.current];
           const mockIds = ["pm-1", "pm-2", "pm-3", "pm-4"];
+          let finalPmList = [...currentBeneficiariesRef.current].filter((pm) => !mockIds.includes(pm.id));
+          
+          // Check if there are local PM modifications saved in localStorage
+          const cachedPmStr = localStorage.getItem("silks_guest_beneficiaries");
+          const hasPmMods = cachedPmStr && cachedPmStr !== JSON.stringify(INITIAL_BENEFICIARIES);
 
           if (!querySnap.empty) {
             const cloudPM: Beneficiary[] = [];
@@ -354,35 +413,46 @@ function SiLksBloraApp() {
             });
 
             // Merge guest additions if active
-            if (hasGuestModificationsRef.current) {
-              const mergedPM = [...cloudPM];
-              let pmMergedCount = 0;
-              for (const localPm of finalPmList) {
-                const exists = cloudPM.find((cp) => cp.id === localPm.id);
-                if (!exists && !mockIds.includes(localPm.id)) {
-                  mergedPM.push(localPm);
-                  await setDoc(doc(db, "beneficiaries", localPm.id), {
-                    ...localPm,
-                    updatedAt: new Date().toISOString(),
-                  });
-                  pmMergedCount++;
+            if (hasPmMods) {
+              try {
+                const cachedList = JSON.parse(cachedPmStr) as Beneficiary[];
+                const mergedPM = [...cloudPM];
+                let pmMergedCount = 0;
+                for (const localPm of cachedList) {
+                  const exists = cloudPM.find((cp) => cp.id === localPm.id);
+                  if (!exists && !mockIds.includes(localPm.id)) {
+                    mergedPM.push(localPm);
+                    await setDoc(doc(db, "beneficiaries", localPm.id), {
+                      ...localPm,
+                      updatedAt: new Date().toISOString(),
+                    });
+                    pmMergedCount++;
+                  }
                 }
+                if (pmMergedCount > 0) {
+                  showToast(
+                    "success",
+                    "Sinkronisasi PM Berhasil",
+                    `Berhasil mensinkronkan ${pmMergedCount} Penerima Manfaat baru ke database cloud Anda.`,
+                  );
+                }
+                finalPmList = mergedPM;
+              } catch (e) {
+                console.error("Gagal sinkronisasi PM:", e);
+                finalPmList = cloudPM;
               }
-              if (pmMergedCount > 0) {
-                showToast(
-                  "success",
-                  "Sinkronisasi PM Berhasil",
-                  `Berhasil mensinkronkan ${pmMergedCount} Penerima Manfaat baru ke database cloud Anda.`,
-                );
-              }
-              finalPmList = mergedPM;
-              hasGuestModificationsRef.current = false;
+              localStorage.removeItem("silks_guest_beneficiaries");
             } else {
               finalPmList = cloudPM;
             }
             setBeneficiaries(finalPmList);
           } else {
             // Seed database
+            if (hasPmMods) {
+              try {
+                finalPmList = JSON.parse(cachedPmStr) as Beneficiary[];
+              } catch (e) {}
+            }
             const batch = writeBatch(db);
             const activeLocalPMs = finalPmList.filter(
               (pm) => !mockIds.includes(pm.id),
@@ -396,7 +466,7 @@ function SiLksBloraApp() {
             });
             await batch.commit();
             setBeneficiaries(activeLocalPMs);
-            hasGuestModificationsRef.current = false;
+            localStorage.removeItem("silks_guest_beneficiaries");
           }
         }, (error) => {
           console.error("PM Realtime Sync Error:", error);
@@ -413,6 +483,10 @@ function SiLksBloraApp() {
         setLksList(INITIAL_LKS_DATA);
         setBeneficiaries(INITIAL_BENEFICIARIES);
         setSettings(INITIAL_SETTINGS);
+        try {
+          localStorage.removeItem("silks_guest_lks");
+          localStorage.removeItem("silks_guest_beneficiaries");
+        } catch (e) {}
       }
     });
 
