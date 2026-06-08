@@ -4,9 +4,21 @@ import { getFirestore } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
 export const auth = getAuth();
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope("https://www.googleapis.com/auth/drive.file");
+googleProvider.addScope("https://www.googleapis.com/auth/drive.metadata.readonly");
+
+let googleAccessToken: string | null = null;
+
+export function getGoogleAccessToken() {
+  return googleAccessToken;
+}
+
+export function setGoogleAccessToken(token: string | null) {
+  googleAccessToken = token;
+}
 
 export enum OperationType {
   CREATE = "create",
@@ -58,6 +70,10 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 export async function loginWithGoogle() {
   try {
     const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential && credential.accessToken) {
+      googleAccessToken = credential.accessToken;
+    }
     return result.user;
   } catch (error) {
     console.error("Auth Login Error:", error);
@@ -68,6 +84,7 @@ export async function loginWithGoogle() {
 export async function logoutUser() {
   try {
     await signOut(auth);
+    googleAccessToken = null;
   } catch (error) {
     console.error("Auth Logout Error:", error);
     throw error;

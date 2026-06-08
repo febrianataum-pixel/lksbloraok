@@ -1,10 +1,9 @@
 {
-  "projectId": "lksdinsos",
-  "appId": "1:1000525825418:web:0e40e15d9eaa30327a7473",
-  "apiKey": "AIzaSyBFKa8PhNTl2mj4oTuUFfY51aaAKB_ektM",
-  "authDomain": "lksdinsos.firebaseapp.com",
-  "firestoreDatabaseId": "(default)",
-  "storageBucket": "lksdinsos.firebasestorage.app",
-  "messagingSenderId": "1000525825418",
-  "measurementId": "G-HNP4GE9PH3"
+  "projectId": "leafy-builder-371nt",
+  "appId": "1:558128204930:web:460d4537e97a735beaf89b",
+  "apiKey": "AIzaSyCCLrbRdA-GO9xBfNjngAZsL6vAOQByjjs",
+  "authDomain": "leafy-builder-371nt.firebaseapp.com",
+  "storageBucket": "leafy-builder-371nt.firebasestorage.app",
+  "messagingSenderId": "558128204930",
+  "measurementId": ""
 }

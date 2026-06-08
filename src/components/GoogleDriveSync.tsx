@@ -3,6 +3,7 @@ import { LKS, DocumentInfo, DinsosSettings } from "../types";
 import { useNotifications } from "./NotificationManager";
 import { compressFile } from "../utils/compression";
 import { saveFileLocally, getFileLocally, deleteFileLocally } from "../utils/fileStorage";
+import { getGoogleAccessToken } from "../firebase";
 import { 
   FileText, CheckCircle2, AlertCircle, UploadCloud, 
   Trash2, Eye, RefreshCw, Layers, Link, HardDrive, 
@@ -60,6 +61,218 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
     { key: "sertifikatAccreditation", label: "Sertifikat Akreditasi", desc: "Sertifikat status akreditasi keaktifan LKS" }
   ];
 
+  const extractFolderId = (url: string) => {
+    if (!url) return "";
+    const matches = url.match(/\/folders\/([a-zA-Z0-9_-]{20,80})/);
+    if (matches && matches[1]) return matches[1];
+    try {
+      const urlObj = new URL(url);
+      const id = urlObj.searchParams.get("id");
+      if (id) return id;
+    } catch (e) {}
+    if (/^[a-zA-Z0-9_-]{25,50}$/.test(url.trim())) {
+      return url.trim();
+    }
+    return "";
+  };
+
+  const uploadToGoogleDrive = async (
+    accessToken: string,
+    file: File,
+    lksName: string,
+    folderRootName: string,
+    customDriveLink?: string
+  ): Promise<{ fileId: string; webViewLink?: string }> => {
+    let rootFolderId = "root";
+    
+    if (customDriveLink) {
+      const extractedId = extractFolderId(customDriveLink);
+      if (extractedId) {
+        rootFolderId = extractedId;
+      }
+    } else {
+      // Find or create root folder under Google Drive Root
+      const q = `name = '${folderRootName}' and mimeType = 'application/vnd.google-apps.folder' and 'root' in parents and trashed = false`;
+      const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        if (searchData.files && searchData.files.length > 0) {
+          rootFolderId = searchData.files[0].id;
+        } else {
+          const createRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              name: folderRootName,
+              mimeType: "application/vnd.google-apps.folder",
+              parents: ["root"],
+            }),
+          });
+          if (createRes.ok) {
+            const createData = await createRes.json();
+            rootFolderId = createData.id;
+          }
+        }
+      }
+    }
+
+    // Find or create LKS subfolder
+    let lksFolderId = rootFolderId;
+    const subQ = `name = '${lksName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and '${rootFolderId}' in parents and trashed = false`;
+    const subRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(subQ)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (subRes.ok) {
+      const subData = await subRes.json();
+      if (subData.files && subData.files.length > 0) {
+        lksFolderId = subData.files[0].id;
+      } else {
+        const createSubRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: lksName,
+            mimeType: "application/vnd.google-apps.folder",
+            parents: [rootFolderId],
+          }),
+        });
+        if (createSubRes.ok) {
+          const createSubData = await createSubRes.json();
+          lksFolderId = createSubData.id;
+        }
+      }
+    }
+
+    // Overwrite check
+    let existingFileId: string | null = null;
+    const fileQ = `name = '${file.name.replace(/'/g, "\\'")}' and '${lksFolderId}' in parents and trashed = false`;
+    const fileSearchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(fileQ)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (fileSearchRes.ok) {
+      const fileSearchData = await fileSearchRes.json();
+      if (fileSearchData.files && fileSearchData.files.length > 0) {
+        existingFileId = fileSearchData.files[0].id;
+      }
+    }
+
+    const metadata = {
+      name: file.name,
+      mimeType: file.type,
+      parents: existingFileId ? undefined : [lksFolderId]
+    };
+
+    const uploadUrl = existingFileId
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`
+      : "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+
+    const method = existingFileId ? "PATCH" : "POST";
+
+    const fileData = await new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+
+    const boundary = "SILKSDriveUploadBoundary";
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const close_delim = `\r\n--${boundary}--`;
+
+    const multipartBody = new Blob([
+      delimiter,
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n",
+      JSON.stringify(metadata),
+      delimiter,
+      `Content-Type: ${file.type}\r\n\r\n`,
+      new Uint8Array(fileData),
+      close_delim
+    ], { type: `multipart/related; boundary=${boundary}` });
+
+    const uploadRes = await fetch(uploadUrl, {
+      method,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": `multipart/related; boundary=${boundary}`
+      },
+      body: multipartBody
+    });
+
+    if (!uploadRes.ok) {
+      const errorText = await uploadRes.text();
+      throw new Error(`Upload gagal: ${errorText}`);
+    }
+
+    const uploadData = await uploadRes.json();
+    const fileId = uploadData.id;
+
+    // Get webViewLink
+    let webViewLink: string | undefined = undefined;
+    const metaRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=webViewLink`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (metaRes.ok) {
+       const metaDataOutput = await metaRes.json();
+       webViewLink = metaDataOutput.webViewLink;
+    }
+
+    return { fileId, webViewLink };
+  };
+
+  const deleteFromGoogleDrive = async (accessToken: string, fileName: string, lksName: string, folderRootName: string, customDriveLink?: string) => {
+    try {
+      let rootFolderId = "root";
+      if (customDriveLink) {
+        const extractedId = extractFolderId(customDriveLink);
+        if (extractedId) rootFolderId = extractedId;
+      } else {
+        const q = `name = '${folderRootName}' and mimeType = 'application/vnd.google-apps.folder' and 'root' in parents and trashed = false`;
+        const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          if (searchData.files && searchData.files.length > 0) rootFolderId = searchData.files[0].id;
+        }
+      }
+
+      let lksFolderId = rootFolderId;
+      const subQ = `name = '${lksName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and '${rootFolderId}' in parents and trashed = false`;
+      const subRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(subQ)}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (subRes.ok) {
+        const subData = await subRes.json();
+        if (subData.files && subData.files.length > 0) lksFolderId = subData.files[0].id;
+      }
+
+      const fileQ = `name = '${fileName.replace(/'/g, "\\'")}' and '${lksFolderId}' in parents and trashed = false`;
+      const fileSearchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(fileQ)}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (fileSearchRes.ok) {
+        const fileSearchData = await fileSearchRes.json();
+        if (fileSearchData.files && fileSearchData.files.length > 0) {
+          const fileId = fileSearchData.files[0].id;
+          await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Gagal menghapus berkas dari Google Drive:", err);
+    }
+  };
+
   const handleFileUploadSimulated = (docTypeKey: string, files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
@@ -75,7 +288,7 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
     showToast("info", "Auto-Compress", `Menganalisis & mengompresi otomatis '${file.name}' agar hemat ruang...`);
 
     // Run custom client-side compression
-    compressFile(file, 0.70, 1200).then(({ file: compressedFile, originalSize, compressedSize, savingsPercent }) => {
+    compressFile(file, 0.70, 1200).then(async ({ file: compressedFile, originalSize, compressedSize, savingsPercent }) => {
       const origStr = originalSize > 1024 * 1024 
         ? `${(originalSize / 1024 / 1024).toFixed(2)} MB` 
         : `${Math.round(originalSize / 1024)} KB`;
@@ -83,14 +296,54 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
         ? `${(compressedSize / 1024 / 1024).toFixed(2)} MB` 
         : `${Math.round(compressedSize / 1024)} KB`;
 
-      showToast("info", "Mulai Transmisi", `Selesai dikompres (${origStr} → ${compStr}, Ringan ${savingsPercent}%)! Mengunggah ke Drive...`);
+      showToast("info", "Sinkronisasi Drive", "Selesai dikompres! Mengidentifikasi struktur folder & mengunggah ke Google Drive...");
 
-      // Save uncorrupted file/blob to IndexedDB locally
+      const accessToken = getGoogleAccessToken();
+      let realDriveUrl: string | undefined = undefined;
+
+      if (accessToken) {
+        try {
+          const uploadResult = await uploadToGoogleDrive(
+            accessToken,
+            compressedFile,
+            selectedLks.name,
+            rootFolder,
+            settings.googleDriveLink
+          );
+          realDriveUrl = uploadResult.webViewLink;
+          showToast("success", "Sinkron Drive Sukses", `Berkas '${file.name}' sukses ditransmisikan langsung ke cloud Google Drive Anda!`);
+        } catch (driveErr) {
+          console.error("Google Drive API upload failed, falling back to offline IndexedDB:", driveErr);
+          showToast("warning", "Gagal Sinkronisasi Cloud", "Gagal mentransfer berkas ke Google Drive. Disimpan ke cadangan offline.");
+        }
+      } else {
+        showToast("info", "Sesi Drive Belum Aktif", "Anda berada dalam mode demo lokal. Hubungkan akun di panel atas untuk sinkronisasi cloud riil.");
+      }
+
+      // Save uncorrupted file/blob to IndexedDB locally for local previews & robustness
       saveFileLocally(selectedLks.id, docTypeKey, compressedFile).then(() => {
-        setTimeout(() => {
+        const docInfo: DocumentInfo = {
+          name: file.name,
+          url: realDriveUrl || "local_indexeddb",
+          uploadedAt: new Date().toISOString(),
+          size: compStr,
+          sizeBefore: origStr,
+          isCompressed: savingsPercent > 0,
+          compressionSavings: savingsPercent
+        };
+
+        onUpdateLksDocs(selectedLks.id, docTypeKey, docInfo);
+        setSyncingDocs(prev => ({ ...prev, [docTypeKey]: false }));
+      }).catch(err => {
+        console.error("Local indexedDB save failed, fallback to in-memory URL", err);
+        
+        // If IndexedDB fails, fallback to full base64/ObjectUrl
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const fileUrl = reader.result as string || URL.createObjectURL(compressedFile);
           const docInfo: DocumentInfo = {
             name: file.name,
-            url: "local_indexeddb", // Store a lightweight signifier in Firestore to represent localIndexedDB copy
+            url: realDriveUrl || fileUrl,
             uploadedAt: new Date().toISOString(),
             size: compStr,
             sizeBefore: origStr,
@@ -100,34 +353,6 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
 
           onUpdateLksDocs(selectedLks.id, docTypeKey, docInfo);
           setSyncingDocs(prev => ({ ...prev, [docTypeKey]: false }));
-          if (settings.googleDriveLink) {
-            showToast("success", "Sinkronisasi Sukses", `Berkas '${file.name}' (${compStr}) disinkronkan langsung ke link Google Drive kustom Anda dalam subfolder /${selectedLks.name}/`);
-          } else {
-            showToast("success", "Upload Sukses", `File '${file.name}' (${compStr}) diunggah sukses di folder virtual: /${rootFolder}/${selectedLks.name}/`);
-          }
-        }, 1500);
-      }).catch(err => {
-        console.error("Local indexedDB save failed, fallback to in-memory URL", err);
-        
-        // If IndexedDB fails, fallback to full base64/ObjectUrl (warning: may exceed firestore doc limits if extremely large)
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const fileUrl = reader.result as string || URL.createObjectURL(compressedFile);
-          setTimeout(() => {
-            const docInfo: DocumentInfo = {
-              name: file.name,
-              url: fileUrl,
-              uploadedAt: new Date().toISOString(),
-              size: compStr,
-              sizeBefore: origStr,
-              isCompressed: savingsPercent > 0,
-              compressionSavings: savingsPercent
-            };
-
-            onUpdateLksDocs(selectedLks.id, docTypeKey, docInfo);
-            setSyncingDocs(prev => ({ ...prev, [docTypeKey]: false }));
-            showToast("success", "Upload Sukses", `File '${file.name}' (${compStr}) diunggah sukses di folder: /${rootFolder}/${selectedLks.name}/`);
-          }, 1500);
         };
         reader.readAsDataURL(compressedFile);
       });
@@ -141,13 +366,27 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
       title: "Hapus Berkas Administrasi?",
       message: `Apakah Anda yakin ingin menghapus dokumen '${docName}' dari LKS ${selectedLks.name}? Sinkronisasi file di Google Drive juga akan dihapus.`,
       onConfirm: async () => {
+        const rootFolder = settings.googleDriveRoot || "SILKS";
+        const accessToken = getGoogleAccessToken();
+        
+        if (accessToken) {
+          showToast("info", "Menghapus Sinkron", "Hapus transmisi dalam cloud Drive...");
+          await deleteFromGoogleDrive(
+            accessToken,
+            docName,
+            selectedLks.name,
+            rootFolder,
+            settings.googleDriveLink
+          );
+        }
+
         try {
           await deleteFileLocally(selectedLks.id, docTypeKey);
         } catch (e) {
           console.error("Failed to delete local copy", e);
         }
         onUpdateLksDocs(selectedLks.id, docTypeKey, null);
-        showToast("success", "Hapus Berkas", "Berkas administrasi berhasil dihapus.");
+        showToast("success", "Hapus Berkas", "Berkas administrasi dan sinkronisasinya berhasil dihapus.");
       }
     });
   };
@@ -459,7 +698,27 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                 {previewDoc.url && previewDoc.url !== "#" ? (
                   /* RENDER REAL UPLOADED FILE */
                   <div className="w-full h-full flex flex-col gap-3">
-                    {previewDoc.url.includes("data:application/pdf") || previewDoc.docName.toLowerCase().endsWith(".pdf") ? (
+                    {previewDoc.url.includes("drive.google.com") ? (
+                      /* RENDER GOOGLE DRIVE COMPONENT VIEW */
+                      <div className="w-full h-full flex flex-col gap-4 items-center justify-center text-center p-6 bg-white rounded-2xl border border-slate-200 min-h-[350px]">
+                        <div className="p-4 bg-indigo-50 text-indigo-700 rounded-full">
+                          <HardDrive className="w-12 h-12" />
+                        </div>
+                        <h4 className="font-bold text-slate-900 text-sm">Berkas Tersimpan Resmi di Google Drive</h4>
+                        <p className="text-xs text-slate-500 max-w-md leading-relaxed">
+                          Dokumen &ldquo;{previewDoc.docName}&rdquo; disinkronkan ke Cloud Drive Anda. Karena kebijakan keamanan peramban, Anda dapat membukanya langsung di Google Drive secara aman.
+                        </p>
+                        <a
+                          href={previewDoc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-xs rounded-xl transition-all shadow-md mt-2 cursor-pointer"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Buka di Google Drive
+                        </a>
+                      </div>
+                    ) : previewDoc.url.includes("data:application/pdf") || previewDoc.docName.toLowerCase().endsWith(".pdf") ? (
                       <div className="w-full h-full flex flex-col gap-3">
                         {/* Mobile Help Banner */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl shrink-0">
