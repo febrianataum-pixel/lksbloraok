@@ -55,6 +55,7 @@ import {
   deleteDoc,
   updateDoc,
   writeBatch,
+  onSnapshot,
 } from "firebase/firestore";
 
 // Lucide Icons
@@ -248,168 +249,180 @@ function SiLksBloraApp() {
     string | null
   >(null);
 
-  // Hook Firebase authentication monitor
+  // Hook Firebase authentication monitor & active real-time data sync
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    let unsubscribeSettings: (() => void) | null = null;
+    let unsubscribeLks: (() => void) | null = null;
+    let unsubscribePm: (() => void) | null = null;
+
+    const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
       if (user) {
         setCurrentUser(user);
-        // Load cloud documents
-        fetchCloudDatabase(user.uid);
+
+        // 1. Live stream Settings
+        unsubscribeSettings = onSnapshot(doc(db, "settings", "global"), (docSnap) => {
+          if (docSnap.exists()) {
+            setSettings(docSnap.data() as DinsosSettings);
+          } else {
+            // Seed settings in db
+            setDoc(doc(db, "settings", "global"), INITIAL_SETTINGS).catch((e) =>
+              console.error("Gagal inisialisasi pengaturan: ", e)
+            );
+          }
+        });
+
+        // 2. Live stream LKS
+        unsubscribeLks = onSnapshot(collection(db, "lks"), async (querySnap) => {
+          let finalLksList = [...currentLksListRef.current];
+          if (!querySnap.empty) {
+            const cloudLks: LKS[] = [];
+            querySnap.forEach((d) => {
+              cloudLks.push({ id: d.id, ...d.data() } as LKS);
+            });
+
+            // Merge guest modifications if active
+            if (hasGuestModificationsRef.current) {
+              const mergedLks = [...cloudLks];
+              let mergedCount = 0;
+              for (const localLks of finalLksList) {
+                const exists = cloudLks.find((cl) => cl.id === localLks.id);
+                if (!exists) {
+                  mergedLks.push(localLks);
+                  await setDoc(doc(db, "lks", localLks.id), {
+                    ...localLks,
+                    ownerId: user.uid,
+                    updatedAt: new Date().toISOString(),
+                  });
+                  mergedCount++;
+                }
+              }
+              if (mergedCount > 0) {
+                showToast(
+                  "success",
+                  "Sinkronisasi Berhasil",
+                  `Berhasil mensinkronkan ${mergedCount} LKS dari sesi lokal Anda ke cloud Firestore.`,
+                );
+              }
+              finalLksList = mergedLks;
+              hasGuestModificationsRef.current = false;
+            } else {
+              finalLksList = cloudLks;
+            }
+            setLksList(finalLksList);
+          } else {
+            // Seed initial database
+            const batch = writeBatch(db);
+            finalLksList.forEach((lksDoc) => {
+              const lksRef = doc(db, "lks", lksDoc.id);
+              batch.set(lksRef, {
+                ...lksDoc,
+                ownerId: user.uid,
+                updatedAt: new Date().toISOString(),
+              });
+            });
+            await batch.commit();
+            setLksList(finalLksList);
+            if (hasGuestModificationsRef.current) {
+              showToast(
+                "success",
+                "Sesi Disimpan ke Cloud",
+                "Data pendaftaran LKS sesi lokal berhasil diunggah ke database cloud Firestore Anda.",
+              );
+              hasGuestModificationsRef.current = false;
+            }
+          }
+        }, (error) => {
+          console.error("LKS Realtime Sync Error:", error);
+        });
+
+        // 3. Live stream Beneficiaries
+        unsubscribePm = onSnapshot(collection(db, "beneficiaries"), async (querySnap) => {
+          let finalPmList = [...currentBeneficiariesRef.current];
+          const mockIds = ["pm-1", "pm-2", "pm-3", "pm-4"];
+
+          if (!querySnap.empty) {
+            const cloudPM: Beneficiary[] = [];
+            querySnap.forEach((d) => {
+              if (mockIds.includes(d.id)) {
+                // Auto-delete legacy mock IDs if they somehow slip in
+                deleteDoc(doc(db, "beneficiaries", d.id)).catch((err) =>
+                  console.error(`Auto delete ${d.id} error: `, err)
+                );
+              } else {
+                cloudPM.push({ id: d.id, ...d.data() } as Beneficiary);
+              }
+            });
+
+            // Merge guest additions if active
+            if (hasGuestModificationsRef.current) {
+              const mergedPM = [...cloudPM];
+              let pmMergedCount = 0;
+              for (const localPm of finalPmList) {
+                const exists = cloudPM.find((cp) => cp.id === localPm.id);
+                if (!exists && !mockIds.includes(localPm.id)) {
+                  mergedPM.push(localPm);
+                  await setDoc(doc(db, "beneficiaries", localPm.id), {
+                    ...localPm,
+                    updatedAt: new Date().toISOString(),
+                  });
+                  pmMergedCount++;
+                }
+              }
+              if (pmMergedCount > 0) {
+                showToast(
+                  "success",
+                  "Sinkronisasi PM Berhasil",
+                  `Berhasil mensinkronkan ${pmMergedCount} Penerima Manfaat baru ke database cloud Anda.`,
+                );
+              }
+              finalPmList = mergedPM;
+              hasGuestModificationsRef.current = false;
+            } else {
+              finalPmList = cloudPM;
+            }
+            setBeneficiaries(finalPmList);
+          } else {
+            // Seed database
+            const batch = writeBatch(db);
+            const activeLocalPMs = finalPmList.filter(
+              (pm) => !mockIds.includes(pm.id),
+            );
+            activeLocalPMs.forEach((pmDoc) => {
+              const pmRef = doc(db, "beneficiaries", pmDoc.id);
+              batch.set(pmRef, {
+                ...pmDoc,
+                updatedAt: new Date().toISOString(),
+              });
+            });
+            await batch.commit();
+            setBeneficiaries(activeLocalPMs);
+            hasGuestModificationsRef.current = false;
+          }
+        }, (error) => {
+          console.error("PM Realtime Sync Error:", error);
+        });
+
       } else {
         setCurrentUser(null);
-        // Fallback to local presets
+        // Clean up previous real-time listener subscriptions
+        if (unsubscribeSettings) { unsubscribeSettings(); unsubscribeSettings = null; }
+        if (unsubscribeLks) { unsubscribeLks(); unsubscribeLks = null; }
+        if (unsubscribePm) { unsubscribePm(); unsubscribePm = null; }
+
+        // Fallback to local datasets
         setLksList(INITIAL_LKS_DATA);
         setBeneficiaries(INITIAL_BENEFICIARIES);
         setSettings(INITIAL_SETTINGS);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSettings) unsubscribeSettings();
+      if (unsubscribeLks) unsubscribeLks();
+      if (unsubscribePm) unsubscribePm();
+    };
   }, []);
-
-  // Sync / Fetch Firestore direct records
-  const fetchCloudDatabase = async (userId: string) => {
-    try {
-      // 1. Fetch settings
-      const settingsSnap = await getDocs(collection(db, "settings"));
-      if (!settingsSnap.empty) {
-        const cloudSettings = settingsSnap.docs[0].data() as DinsosSettings;
-        setSettings(cloudSettings);
-      } else {
-        // seed initial settings
-        await setDoc(doc(db, "settings", "global"), INITIAL_SETTINGS);
-      }
-
-      // 2. Fetch LKS
-      const lksSnap = await getDocs(collection(db, "lks"));
-      let finalLksList = [...currentLksListRef.current];
-
-      if (!lksSnap.empty) {
-        const cloudLks: LKS[] = [];
-        lksSnap.forEach((d) => {
-          cloudLks.push({ id: d.id, ...d.data() } as LKS);
-        });
-
-        // Merge cloud data with guest data if guest had modifications
-        if (hasGuestModificationsRef.current) {
-          const mergedLks = [...cloudLks];
-          let mergedCount = 0;
-          for (const localLks of finalLksList) {
-            const exists = cloudLks.find((cl) => cl.id === localLks.id);
-            if (!exists) {
-              mergedLks.push(localLks);
-              // Save guest-added LKS directly to Firestore
-              await setDoc(doc(db, "lks", localLks.id), {
-                ...localLks,
-                ownerId: userId,
-                updatedAt: new Date().toISOString(),
-              });
-              mergedCount++;
-            }
-          }
-          if (mergedCount > 0) {
-            showToast(
-              "success",
-              "Sinkronisasi Berhasil",
-              `Berhasil mensinkronkan ${mergedCount} LKS dari sesi lokal Anda ke cloud Firestore.`,
-            );
-          }
-          finalLksList = mergedLks;
-        } else {
-          finalLksList = cloudLks;
-        }
-        setLksList(finalLksList);
-      } else {
-        // seed initial database using the current local list (which preserves guest additions!)
-        const batch = writeBatch(db);
-        finalLksList.forEach((lksDoc) => {
-          const lksRef = doc(db, "lks", lksDoc.id);
-          batch.set(lksRef, {
-            ...lksDoc,
-            ownerId: userId,
-            updatedAt: new Date().toISOString(),
-          });
-        });
-        await batch.commit();
-        setLksList(finalLksList);
-        if (hasGuestModificationsRef.current) {
-          showToast(
-            "success",
-            "Sesi Disimpan ke Cloud",
-            "Data pendaftaran LKS sesi lokal berhasil diunggah ke database cloud Firestore Anda.",
-          );
-        }
-      }
-
-      // 3. Fetch Beneficiaries
-      const pmSnap = await getDocs(collection(db, "beneficiaries"));
-      let finalPmList = [...currentBeneficiariesRef.current];
-      const mockIds = ["pm-1", "pm-2", "pm-3", "pm-4"];
-
-      if (!pmSnap.empty) {
-        const cloudPM: Beneficiary[] = [];
-        pmSnap.forEach((d) => {
-          if (mockIds.includes(d.id)) {
-            // Automatically delete mock PM documents as requested by the user
-            deleteDoc(doc(db, "beneficiaries", d.id)).catch((err) =>
-              console.error(`Auto delete ${d.id} error: `, err),
-            );
-          } else {
-            cloudPM.push({ id: d.id, ...d.data() } as Beneficiary);
-          }
-        });
-
-        // Merge cloud beneficiaries with guest additions
-        if (hasGuestModificationsRef.current) {
-          const mergedPM = [...cloudPM];
-          let pmMergedCount = 0;
-          for (const localPm of finalPmList) {
-            const exists = cloudPM.find((cp) => cp.id === localPm.id);
-            if (!exists && !mockIds.includes(localPm.id)) {
-              mergedPM.push(localPm);
-              // Save guest-added Beneficiary to Firestore
-              await setDoc(doc(db, "beneficiaries", localPm.id), {
-                ...localPm,
-                updatedAt: new Date().toISOString(),
-              });
-              pmMergedCount++;
-            }
-          }
-          if (pmMergedCount > 0) {
-            showToast(
-              "success",
-              "Sinkronisasi PM Berhasil",
-              `Berhasil mensinkronkan ${pmMergedCount} Penerima Manfaat baru ke database cloud Anda.`,
-            );
-          }
-          finalPmList = mergedPM;
-        } else {
-          finalPmList = cloudPM;
-        }
-        setBeneficiaries(finalPmList);
-      } else {
-        // seed with current local list of beneficiaries (excluding deleted mock IDs)
-        const batch = writeBatch(db);
-        const activeLocalPMs = finalPmList.filter(
-          (pm) => !mockIds.includes(pm.id),
-        );
-        activeLocalPMs.forEach((pmDoc) => {
-          const pmRef = doc(db, "beneficiaries", pmDoc.id);
-          batch.set(pmRef, {
-            ...pmDoc,
-            updatedAt: new Date().toISOString(),
-          });
-        });
-        await batch.commit();
-        setBeneficiaries(activeLocalPMs);
-      }
-
-      // Reset guest modifications flag after sync is complete
-      hasGuestModificationsRef.current = false;
-    } catch (error) {
-      console.error("Firestore sync fetch error: ", error);
-    }
-  };
 
   // Safe mutations: updates local registers immediately, hooks firestore calls
   const handleSaveLks = async (updatedLks: LKS) => {
