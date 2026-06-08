@@ -168,6 +168,30 @@ function SiLksBloraApp() {
   );
   const [settings, setSettings] = useState<DinsosSettings>(INITIAL_SETTINGS);
 
+  // Track Guest session modifications to merge on login
+  const hasGuestModificationsRef = useRef<boolean>(false);
+  const currentLksListRef = useRef<LKS[]>(INITIAL_LKS_DATA);
+  const currentBeneficiariesRef = useRef<Beneficiary[]>(INITIAL_BENEFICIARIES);
+
+  useEffect(() => {
+    currentLksListRef.current = lksList;
+  }, [lksList]);
+
+  useEffect(() => {
+    currentBeneficiariesRef.current = beneficiaries;
+  }, [beneficiaries]);
+
+  // Track if guest modified any local data before logging in
+  useEffect(() => {
+    if (!currentUser) {
+      const isLksCustom = JSON.stringify(lksList) !== JSON.stringify(INITIAL_LKS_DATA);
+      const isPmCustom = JSON.stringify(beneficiaries) !== JSON.stringify(INITIAL_BENEFICIARIES);
+      if (isLksCustom || isPmCustom) {
+        hasGuestModificationsRef.current = true;
+      }
+    }
+  }, [lksList, beneficiaries, currentUser]);
+
   // Selected/Active items for detail views & forms
   const [activeLksIdForDocs, setActiveLksIdForDocs] = useState<string>("");
   const [editingLks, setEditingLks] = useState<LKS | null | undefined>(
@@ -258,28 +282,72 @@ function SiLksBloraApp() {
 
       // 2. Fetch LKS
       const lksSnap = await getDocs(collection(db, "lks"));
+      let finalLksList = [...currentLksListRef.current];
+
       if (!lksSnap.empty) {
         const cloudLks: LKS[] = [];
         lksSnap.forEach((d) => {
           cloudLks.push({ id: d.id, ...d.data() } as LKS);
         });
-        setLksList(cloudLks);
+
+        // Merge cloud data with guest data if guest had modifications
+        if (hasGuestModificationsRef.current) {
+          const mergedLks = [...cloudLks];
+          let mergedCount = 0;
+          for (const localLks of finalLksList) {
+            const exists = cloudLks.find((cl) => cl.id === localLks.id);
+            if (!exists) {
+              mergedLks.push(localLks);
+              // Save guest-added LKS directly to Firestore
+              await setDoc(doc(db, "lks", localLks.id), {
+                ...localLks,
+                ownerId: userId,
+                updatedAt: new Date().toISOString(),
+              });
+              mergedCount++;
+            }
+          }
+          if (mergedCount > 0) {
+            showToast(
+              "success",
+              "Sinkronisasi Berhasil",
+              `Berhasil mensinkronkan ${mergedCount} LKS dari sesi lokal Anda ke cloud Firestore.`,
+            );
+          }
+          finalLksList = mergedLks;
+        } else {
+          finalLksList = cloudLks;
+        }
+        setLksList(finalLksList);
       } else {
-        // seed initial mock LKS
+        // seed initial database using the current local list (which preserves guest additions!)
         const batch = writeBatch(db);
-        INITIAL_LKS_DATA.forEach((lksDoc) => {
+        finalLksList.forEach((lksDoc) => {
           const lksRef = doc(db, "lks", lksDoc.id);
-          batch.set(lksRef, { ...lksDoc, ownerId: userId });
+          batch.set(lksRef, {
+            ...lksDoc,
+            ownerId: userId,
+            updatedAt: new Date().toISOString(),
+          });
         });
         await batch.commit();
+        setLksList(finalLksList);
+        if (hasGuestModificationsRef.current) {
+          showToast(
+            "success",
+            "Sesi Disimpan ke Cloud",
+            "Data pendaftaran LKS sesi lokal berhasil diunggah ke database cloud Firestore Anda.",
+          );
+        }
       }
 
       // 3. Fetch Beneficiaries
       const pmSnap = await getDocs(collection(db, "beneficiaries"));
-      const cloudPM: Beneficiary[] = [];
+      let finalPmList = [...currentBeneficiariesRef.current];
       const mockIds = ["pm-1", "pm-2", "pm-3", "pm-4"];
 
       if (!pmSnap.empty) {
+        const cloudPM: Beneficiary[] = [];
         pmSnap.forEach((d) => {
           if (mockIds.includes(d.id)) {
             // Automatically delete mock PM documents as requested by the user
@@ -290,8 +358,54 @@ function SiLksBloraApp() {
             cloudPM.push({ id: d.id, ...d.data() } as Beneficiary);
           }
         });
+
+        // Merge cloud beneficiaries with guest additions
+        if (hasGuestModificationsRef.current) {
+          const mergedPM = [...cloudPM];
+          let pmMergedCount = 0;
+          for (const localPm of finalPmList) {
+            const exists = cloudPM.find((cp) => cp.id === localPm.id);
+            if (!exists && !mockIds.includes(localPm.id)) {
+              mergedPM.push(localPm);
+              // Save guest-added Beneficiary to Firestore
+              await setDoc(doc(db, "beneficiaries", localPm.id), {
+                ...localPm,
+                updatedAt: new Date().toISOString(),
+              });
+              pmMergedCount++;
+            }
+          }
+          if (pmMergedCount > 0) {
+            showToast(
+              "success",
+              "Sinkronisasi PM Berhasil",
+              `Berhasil mensinkronkan ${pmMergedCount} Penerima Manfaat baru ke database cloud Anda.`,
+            );
+          }
+          finalPmList = mergedPM;
+        } else {
+          finalPmList = cloudPM;
+        }
+        setBeneficiaries(finalPmList);
+      } else {
+        // seed with current local list of beneficiaries (excluding deleted mock IDs)
+        const batch = writeBatch(db);
+        const activeLocalPMs = finalPmList.filter(
+          (pm) => !mockIds.includes(pm.id),
+        );
+        activeLocalPMs.forEach((pmDoc) => {
+          const pmRef = doc(db, "beneficiaries", pmDoc.id);
+          batch.set(pmRef, {
+            ...pmDoc,
+            updatedAt: new Date().toISOString(),
+          });
+        });
+        await batch.commit();
+        setBeneficiaries(activeLocalPMs);
       }
-      setBeneficiaries(cloudPM);
+
+      // Reset guest modifications flag after sync is complete
+      hasGuestModificationsRef.current = false;
     } catch (error) {
       console.error("Firestore sync fetch error: ", error);
     }
