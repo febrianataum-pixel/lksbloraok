@@ -7,14 +7,12 @@ import { motion } from "motion/react";
 
 interface LoginScreenProps {
   onGoogleSignIn: () => void;
-  onAnonymousSignIn: () => void;
   onEnterAsGuest: () => void;
   logoUrl: string;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onGoogleSignIn,
-  onAnonymousSignIn,
   onEnterAsGuest,
   logoUrl
 }) => {
@@ -24,15 +22,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setLoading(true);
     try {
       await onGoogleSignIn();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAnonymousLogin = async () => {
-    setLoading(true);
-    try {
-      await onAnonymousSignIn();
     } finally {
       setLoading(false);
     }
@@ -160,16 +149,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <span>Masuk dengan Google</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleAnonymousLogin}
-                disabled={loading}
-                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-xs rounded-2xl transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
-              >
-                <CloudLightning className="w-4 h-4 text-emerald-100 animate-pulse" />
-                <span>Masuk ke Cloud Instan (Bebas Popup)</span>
-              </button>
-
               <div className="relative py-2 flex items-center justify-center">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-100"></div>
@@ -189,20 +168,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
 
             {/* Bottom Disclaimer */}
-            <div className="mt-8 pt-4 border-t border-slate-100 text-center text-[9px] text-slate-400 leading-normal flex flex-col gap-3">
-              <div className="flex items-start gap-1.5 text-left bg-slate-50 p-3 rounded-xl border border-slate-150">
-                <ShieldAlert className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                <span>
-                  Dengan masuk, Anda menyetujui sinkronisasi pangkalan data <strong>Regristrasi LKS</strong> ke database cloud Firestore aman dan Google Drive milik lembaga Anda secara otomatis.
-                </span>
-              </div>
-
-              <div className="flex items-start gap-1.5 text-left bg-indigo-50/60 p-3 rounded-xl border border-indigo-100 text-indigo-700">
-                <CloudLightning className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Tip Pengujian Sandbox:</strong> Jika login/popup Google terhalang oleh pemblokir iklan/popup di dalam frame preview AI Studio, silakan klik opsi <strong>"Open in New Tab"</strong> (Buka di Tab Baru) pada menu kanan atas browser. Data yang Anda buat di Sesi Tamu tersimpan aman di penyimpanan lokal (localStorage) dan akan <strong>langsung tersinkron otomatis</strong> ketika Anda login di tab baru tersebut dengan akun yang sama!
-                </span>
-              </div>
+            <div className="mt-8 pt-4 border-t border-slate-100 text-center text-[9px] text-slate-400 leading-normal flex items-start gap-1.5 text-left bg-slate-50 p-3 rounded-xl border border-slate-150">
+              <ShieldAlert className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+              <span>
+                Dengan masuk, Anda menyetujui sinkronisasi pangkalan data <strong>Regristrasi LKS</strong> ke database cloud Firestore aman dan Google Drive milik lembaga Anda secara otomatis.
+              </span>
             </div>
 
           </div>

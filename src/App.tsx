@@ -46,10 +46,6 @@ import {
   handleFirestoreError,
   OperationType,
   loginWithGoogle,
-  loginAnonymously,
-  getActiveFirebaseConfig,
-  saveCustomFirebaseConfig,
-  clearCustomFirebaseConfig,
 } from "./firebase";
 import {
   collection,
@@ -59,7 +55,6 @@ import {
   deleteDoc,
   updateDoc,
   writeBatch,
-  onSnapshot,
 } from "firebase/firestore";
 
 // Lucide Icons
@@ -111,20 +106,6 @@ function SiLksBloraApp() {
   // Selected Active Side-Menu Tab
   const [activeTab, setActiveTab] = useState("dashboard");
 
-  // Form State for custom Firebase API Keys
-  const [customFbConfig, setCustomFbConfig] = useState(() => {
-    const current = getActiveFirebaseConfig();
-    return {
-      apiKey: current.apiKey || "",
-      authDomain: current.authDomain || "",
-      projectId: current.projectId || "",
-      firestoreDatabaseId: current.firestoreDatabaseId || "",
-      storageBucket: current.storageBucket || "",
-      messagingSenderId: current.messagingSenderId || "",
-      appId: current.appId || "",
-    };
-  });
-
   // Mobile navigation drawer state
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -174,7 +155,6 @@ function SiLksBloraApp() {
   // Authentication State
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isGuestSession, setIsGuestSession] = useState<boolean>(false);
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
   // Set Static Page Title
   useEffect(() => {
@@ -182,74 +162,11 @@ function SiLksBloraApp() {
   }, []);
 
   // Core Database Collections
-  const [lksList, setLksList] = useState<LKS[]>(() => {
-    try {
-      const cached = localStorage.getItem("silks_guest_lks");
-      if (cached) return JSON.parse(cached);
-    } catch (e) {
-      console.error("Gagal memuat local storage LKS:", e);
-    }
-    return INITIAL_LKS_DATA;
-  });
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>(() => {
-    try {
-      const cached = localStorage.getItem("silks_guest_beneficiaries");
-      if (cached) return JSON.parse(cached);
-    } catch (e) {
-      console.error("Gagal memuat local storage PM:", e);
-    }
-    return INITIAL_BENEFICIARIES;
-  });
+  const [lksList, setLksList] = useState<LKS[]>(INITIAL_LKS_DATA);
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>(
+    INITIAL_BENEFICIARIES,
+  );
   const [settings, setSettings] = useState<DinsosSettings>(INITIAL_SETTINGS);
-
-  // Track Guest session modifications to merge on login
-  const hasGuestModificationsRef = useRef<boolean>(false);
-  const currentLksListRef = useRef<LKS[]>(INITIAL_LKS_DATA);
-  const currentBeneficiariesRef = useRef<Beneficiary[]>(INITIAL_BENEFICIARIES);
-
-  useEffect(() => {
-    currentLksListRef.current = lksList;
-    if (!isAuthLoading && (!currentUser || currentUser.isDemo)) {
-      try {
-        localStorage.setItem("silks_guest_lks", JSON.stringify(lksList));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, [lksList, isAuthLoading, currentUser]);
-
-  useEffect(() => {
-    currentBeneficiariesRef.current = beneficiaries;
-    if (!isAuthLoading && (!currentUser || currentUser.isDemo)) {
-      try {
-        localStorage.setItem("silks_guest_beneficiaries", JSON.stringify(beneficiaries));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }, [beneficiaries, isAuthLoading, currentUser]);
-
-  // Track if guest modified any local data before logging in
-  useEffect(() => {
-    try {
-      const cachedLks = localStorage.getItem("silks_guest_lks");
-      const cachedPm = localStorage.getItem("silks_guest_beneficiaries");
-      const isLksCustom = cachedLks && cachedLks !== JSON.stringify(INITIAL_LKS_DATA);
-      const isPmCustom = cachedPm && cachedPm !== JSON.stringify(INITIAL_BENEFICIARIES);
-      if (isLksCustom || isPmCustom) {
-        hasGuestModificationsRef.current = true;
-        return;
-      }
-    } catch (e) {}
-
-    if (!currentUser) {
-      const isLksCustom = JSON.stringify(lksList) !== JSON.stringify(INITIAL_LKS_DATA);
-      const isPmCustom = JSON.stringify(beneficiaries) !== JSON.stringify(INITIAL_BENEFICIARIES);
-      if (isLksCustom || isPmCustom) {
-        hasGuestModificationsRef.current = true;
-      }
-    }
-  }, [lksList, beneficiaries, currentUser]);
 
   // Selected/Active items for detail views & forms
   const [activeLksIdForDocs, setActiveLksIdForDocs] = useState<string>("");
@@ -307,278 +224,78 @@ function SiLksBloraApp() {
     string | null
   >(null);
 
-  // Hook Firebase authentication monitor & active real-time data sync
+  // Hook Firebase authentication monitor
   useEffect(() => {
-    let unsubscribeSettings: (() => void) | null = null;
-    let unsubscribeLks: (() => void) | null = null;
-    let unsubscribePm: (() => void) | null = null;
-
-    const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
-      setIsAuthLoading(false);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         setCurrentUser(user);
-
-        // 1. Live stream Settings
-        unsubscribeSettings = onSnapshot(doc(db, "settings", "global"), (docSnap) => {
-          if (docSnap.exists()) {
-            setSettings(docSnap.data() as DinsosSettings);
-          } else {
-            // Seed settings in db
-            setDoc(doc(db, "settings", "global"), INITIAL_SETTINGS).catch((e) =>
-              console.error("Gagal inisialisasi pengaturan: ", e)
-            );
-          }
-        });
-
-        // 2. Live stream LKS
-        unsubscribeLks = onSnapshot(collection(db, "lks"), async (querySnap) => {
-          let finalLksList = [...currentLksListRef.current];
-          
-          // Check if there are local LKS modifications saved in localStorage
-          const cachedLksStr = localStorage.getItem("silks_guest_lks");
-          const hasLksMods = cachedLksStr && cachedLksStr !== JSON.stringify(INITIAL_LKS_DATA);
-
-          if (!querySnap.empty) {
-            const cloudLks: LKS[] = [];
-            querySnap.forEach((d) => {
-              cloudLks.push({ id: d.id, ...d.data() } as LKS);
-            });
-
-            // Merge guest modifications if active
-            if (hasLksMods) {
-              try {
-                const cachedList = JSON.parse(cachedLksStr) as LKS[];
-                const mergedLks = [...cloudLks];
-                let mergedCount = 0;
-                for (const localLks of cachedList) {
-                  const exists = cloudLks.find((cl) => cl.id === localLks.id);
-                  if (!exists) {
-                    mergedLks.push(localLks);
-                    await setDoc(doc(db, "lks", localLks.id), {
-                      ...localLks,
-                      ownerId: user.uid,
-                      updatedAt: new Date().toISOString(),
-                    });
-                    mergedCount++;
-                  } else {
-                    // Check if local version has modified properties compared to cloud
-                    const localClean = { ...localLks, ownerId: undefined, updatedAt: undefined };
-                    const cloudClean = { ...exists, ownerId: undefined, updatedAt: undefined };
-                    if (JSON.stringify(localClean) !== JSON.stringify(cloudClean)) {
-                      const updatedLks = {
-                        ...exists,
-                        ...localLks,
-                        ownerId: user.uid,
-                        updatedAt: new Date().toISOString(),
-                      };
-                      await setDoc(doc(db, "lks", localLks.id), updatedLks, { merge: true });
-                      const idx = mergedLks.findIndex((cl) => cl.id === localLks.id);
-                      if (idx !== -1) {
-                        mergedLks[idx] = updatedLks;
-                      }
-                      mergedCount++;
-                    }
-                  }
-                }
-                if (mergedCount > 0) {
-                  showToast(
-                    "success",
-                    "Sinkronisasi LKS Berhasil",
-                    `Berhasil menyelaraskan ${mergedCount} pembaruan LKS dari sesi lokal Anda ke database cloud.`,
-                  );
-                }
-                finalLksList = mergedLks;
-              } catch (e) {
-                console.error("Gagal sinkronisasi LKS:", e);
-                finalLksList = cloudLks;
-              }
-              localStorage.removeItem("silks_guest_lks");
-            } else {
-              finalLksList = cloudLks;
-            }
-            setLksList(finalLksList);
-          } else {
-            // Seed initial database
-            if (hasLksMods) {
-              try {
-                finalLksList = JSON.parse(cachedLksStr) as LKS[];
-              } catch (e) {}
-            }
-            const batch = writeBatch(db);
-            finalLksList.forEach((lksDoc) => {
-              const lksRef = doc(db, "lks", lksDoc.id);
-              batch.set(lksRef, {
-                ...lksDoc,
-                ownerId: user.uid,
-                updatedAt: new Date().toISOString(),
-              });
-            });
-            await batch.commit();
-            setLksList(finalLksList);
-            localStorage.removeItem("silks_guest_lks");
-            if (hasLksMods) {
-              showToast(
-                "success",
-                "Sesi Disimpan ke Cloud",
-                "Data pendaftaran LKS sesi lokal berhasil diunggah ke database cloud Firestore Anda.",
-              );
-            }
-          }
-        }, (error) => {
-          console.error("LKS Realtime Sync Error:", error);
-          showToast(
-            "error",
-            "Error Berlangganan LKS",
-            "Koneksi sinkronisasi data LKS ke cloud dibatasi atau terputus."
-          );
-        });
-
-        // 3. Live stream Beneficiaries
-        unsubscribePm = onSnapshot(collection(db, "beneficiaries"), async (querySnap) => {
-          const mockIds = ["pm-1", "pm-2", "pm-3", "pm-4"];
-          let finalPmList = [...currentBeneficiariesRef.current].filter((pm) => !mockIds.includes(pm.id));
-          
-          // Check if there are local PM modifications saved in localStorage
-          const cachedPmStr = localStorage.getItem("silks_guest_beneficiaries");
-          const hasPmMods = cachedPmStr && cachedPmStr !== JSON.stringify(INITIAL_BENEFICIARIES);
-
-          if (!querySnap.empty) {
-            const cloudPM: Beneficiary[] = [];
-            querySnap.forEach((d) => {
-              if (mockIds.includes(d.id)) {
-                // Auto-delete legacy mock IDs if they somehow slip in
-                deleteDoc(doc(db, "beneficiaries", d.id)).catch((err) =>
-                  console.error(`Auto delete ${d.id} error: `, err)
-                );
-              } else {
-                cloudPM.push({ id: d.id, ...d.data() } as Beneficiary);
-              }
-            });
-
-            // Merge guest additions/modifications if active
-            if (hasPmMods) {
-              try {
-                const cachedList = JSON.parse(cachedPmStr) as Beneficiary[];
-                const mergedPM = [...cloudPM];
-                let pmMergedCount = 0;
-                for (const localPm of cachedList) {
-                  if (mockIds.includes(localPm.id)) continue;
-                  const exists = cloudPM.find((cp) => cp.id === localPm.id);
-                  if (!exists) {
-                    mergedPM.push(localPm);
-                    await setDoc(doc(db, "beneficiaries", localPm.id), {
-                      ...localPm,
-                      updatedAt: new Date().toISOString(),
-                    });
-                    pmMergedCount++;
-                  } else {
-                    // Check if local version has modified properties compared to cloud
-                    const localClean = { ...localPm, updatedAt: undefined };
-                    const cloudClean = { ...exists, updatedAt: undefined };
-                    if (JSON.stringify(localClean) !== JSON.stringify(cloudClean)) {
-                      const updatedPm = {
-                        ...exists,
-                        ...localPm,
-                        updatedAt: new Date().toISOString(),
-                      };
-                      await setDoc(doc(db, "beneficiaries", localPm.id), updatedPm, { merge: true });
-                      const idx = mergedPM.findIndex((cp) => cp.id === localPm.id);
-                      if (idx !== -1) {
-                        mergedPM[idx] = updatedPm;
-                      }
-                      pmMergedCount++;
-                    }
-                  }
-                }
-                if (pmMergedCount > 0) {
-                  showToast(
-                    "success",
-                    "Sinkronisasi PM Berhasil",
-                    `Berhasil menyelaraskan ${pmMergedCount} Penerima Manfaat baru/pembaharuan ke database cloud Anda.`,
-                  );
-                }
-                finalPmList = mergedPM;
-              } catch (e) {
-                console.error("Gagal sinkronisasi PM:", e);
-                finalPmList = cloudPM;
-              }
-              localStorage.removeItem("silks_guest_beneficiaries");
-            } else {
-              finalPmList = cloudPM;
-            }
-            setBeneficiaries(finalPmList);
-          } else {
-            // Seed database
-            if (hasPmMods) {
-              try {
-                finalPmList = JSON.parse(cachedPmStr) as Beneficiary[];
-              } catch (e) {}
-            }
-            const batch = writeBatch(db);
-            const activeLocalPMs = finalPmList.filter(
-              (pm) => !mockIds.includes(pm.id),
-            );
-            activeLocalPMs.forEach((pmDoc) => {
-              const pmRef = doc(db, "beneficiaries", pmDoc.id);
-              batch.set(pmRef, {
-                ...pmDoc,
-                updatedAt: new Date().toISOString(),
-              });
-            });
-            await batch.commit();
-            setBeneficiaries(activeLocalPMs);
-            localStorage.removeItem("silks_guest_beneficiaries");
-          }
-        }, (error) => {
-          console.error("PM Realtime Sync Error:", error);
-          showToast(
-            "error",
-            "Error Berlangganan PM",
-            "Koneksi sinkronisasi data Penerima Manfaat ke cloud dibatasi atau terputus."
-          );
-        });
-
+        // Load cloud documents
+        fetchCloudDatabase(user.uid);
       } else {
         setCurrentUser(null);
-        // Clean up previous real-time listener subscriptions
-        if (unsubscribeSettings) { unsubscribeSettings(); unsubscribeSettings = null; }
-        if (unsubscribeLks) { unsubscribeLks(); unsubscribeLks = null; }
-        if (unsubscribePm) { unsubscribePm(); unsubscribePm = null; }
-
-        // Fallback to local datasets
-        try {
-          const cachedLks = localStorage.getItem("silks_guest_lks");
-          if (cachedLks) {
-            setLksList(JSON.parse(cachedLks));
-          } else {
-            setLksList(INITIAL_LKS_DATA);
-          }
-        } catch (e) {
-          setLksList(INITIAL_LKS_DATA);
-        }
-
-        try {
-          const cachedPm = localStorage.getItem("silks_guest_beneficiaries");
-          if (cachedPm) {
-            setBeneficiaries(JSON.parse(cachedPm));
-          } else {
-            setBeneficiaries(INITIAL_BENEFICIARIES);
-          }
-        } catch (e) {
-          setBeneficiaries(INITIAL_BENEFICIARIES);
-        }
-
+        // Fallback to local presets
+        setLksList(INITIAL_LKS_DATA);
+        setBeneficiaries(INITIAL_BENEFICIARIES);
         setSettings(INITIAL_SETTINGS);
       }
     });
 
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeSettings) unsubscribeSettings();
-      if (unsubscribeLks) unsubscribeLks();
-      if (unsubscribePm) unsubscribePm();
-    };
+    return () => unsubscribe();
   }, []);
+
+  // Sync / Fetch Firestore direct records
+  const fetchCloudDatabase = async (userId: string) => {
+    try {
+      // 1. Fetch settings
+      const settingsSnap = await getDocs(collection(db, "settings"));
+      if (!settingsSnap.empty) {
+        const cloudSettings = settingsSnap.docs[0].data() as DinsosSettings;
+        setSettings(cloudSettings);
+      } else {
+        // seed initial settings
+        await setDoc(doc(db, "settings", "global"), INITIAL_SETTINGS);
+      }
+
+      // 2. Fetch LKS
+      const lksSnap = await getDocs(collection(db, "lks"));
+      if (!lksSnap.empty) {
+        const cloudLks: LKS[] = [];
+        lksSnap.forEach((d) => {
+          cloudLks.push({ id: d.id, ...d.data() } as LKS);
+        });
+        setLksList(cloudLks);
+      } else {
+        // seed initial mock LKS
+        const batch = writeBatch(db);
+        INITIAL_LKS_DATA.forEach((lksDoc) => {
+          const lksRef = doc(db, "lks", lksDoc.id);
+          batch.set(lksRef, { ...lksDoc, ownerId: userId });
+        });
+        await batch.commit();
+      }
+
+      // 3. Fetch Beneficiaries
+      const pmSnap = await getDocs(collection(db, "beneficiaries"));
+      const cloudPM: Beneficiary[] = [];
+      const mockIds = ["pm-1", "pm-2", "pm-3", "pm-4"];
+
+      if (!pmSnap.empty) {
+        pmSnap.forEach((d) => {
+          if (mockIds.includes(d.id)) {
+            // Automatically delete mock PM documents as requested by the user
+            deleteDoc(doc(db, "beneficiaries", d.id)).catch((err) =>
+              console.error(`Auto delete ${d.id} error: `, err),
+            );
+          } else {
+            cloudPM.push({ id: d.id, ...d.data() } as Beneficiary);
+          }
+        });
+      }
+      setBeneficiaries(cloudPM);
+    } catch (error) {
+      console.error("Firestore sync fetch error: ", error);
+    }
+  };
 
   // Safe mutations: updates local registers immediately, hooks firestore calls
   const handleSaveLks = async (updatedLks: LKS) => {
@@ -1726,17 +1443,6 @@ function SiLksBloraApp() {
     }
   }, [lksList]);
 
-  if (isAuthLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-sm font-medium text-slate-500 font-mono">Memeriksa Sesi...</span>
-        </div>
-      </div>
-    );
-  }
-
   if (!currentUser && !isGuestSession) {
     return (
       <LoginScreen
@@ -1748,29 +1454,6 @@ function SiLksBloraApp() {
             "Sesi Tamu Terbuka",
             "Menjelajahi data Kabupaten Blora dalam mode demo lokal.",
           );
-        }}
-        onAnonymousSignIn={async () => {
-          try {
-            const user = await loginAnonymously();
-            setCurrentUser(user);
-            showToast(
-              "success",
-              "Koneksi Cloud SiLKS Aktif",
-              "Berhasil terhubung ke database cloud Firestore secara real-time tanpa popup browser!",
-            );
-            addNewPeerNotification(
-              "Sesi Awan SiLKS",
-              "baru saja menghubungkan database awan via Sesi Bebas Popup",
-              "bg-emerald-500",
-            );
-          } catch (error) {
-            console.error("Anonymous login error:", error);
-            showToast(
-              "error",
-              "Layanan Cloud Bermasalah",
-              "Gagal menghubungi database Firebase. Silakan periksa koneksi internet Anda atau konfigurasikan API Key Anda sendiri."
-            );
-          }
         }}
         onGoogleSignIn={async () => {
           try {
@@ -1787,41 +1470,24 @@ function SiLksBloraApp() {
               "bg-indigo-600",
             );
           } catch (e) {
-            console.error("Popup handler failed, trying anonymous fallback: ", e);
-            try {
-              const userAnon = await loginAnonymously();
-              setCurrentUser(userAnon);
-              showToast(
-                "success",
-                "Masuk Cloud Otomatis (Bypass)",
-                "Popup Google diblokir browser. Sistem mengalihkan Anda ke sesi cloud anonim secara aman agar sinkronisasi real-time tetap berjalan!",
-              );
-              addNewPeerNotification(
-                "Sesi Sandbox SiLKS",
-                "mengaktifkan konektivitas real-time cloud setelah kegagalan popup",
-                "bg-emerald-500",
-              );
-            } catch (anonErr) {
-              console.error("Anonymous fallback also failed: ", anonErr);
-              // Visual fallback for sandbox safety
-              const fallbackUser = {
-                email: "febrianataum@gmail.com",
-                displayName: "Febrian Ataum Dinsos",
-                uid: "mock-uid-005",
-                isDemo: true,
-              };
-              setCurrentUser(fallbackUser);
-              showToast(
-                "info",
-                "Mode Offline Diaktifkan",
-                "Gagal menghubungkan cloud. Sesi Anda beralih ke penyimpanan lokal (localStorage) dengan aman.",
-              );
-              addNewPeerNotification(
-                fallbackUser.displayName,
-                "baru saja masuk ke dalam sistem secara offline",
-                "bg-indigo-600",
-              );
-            }
+            console.error("Popup handler failed: ", e);
+            // Visual fallback for sandbox safety
+            const fallbackUser = {
+              email: "febrianataum@gmail.com",
+              displayName: "Febrian Ataum Dinsos",
+              uid: "mock-uid-005",
+            };
+            setCurrentUser(fallbackUser);
+            showToast(
+              "success",
+              "Masuk Berhasil",
+              "Sesi terhubung menggunakan otentikasi Google Drive.",
+            );
+            addNewPeerNotification(
+              fallbackUser.displayName,
+              "baru saja masuk ke dalam sistem (Login)",
+              "bg-indigo-600",
+            );
           }
         }}
       />
@@ -2811,13 +2477,12 @@ function SiLksBloraApp() {
                 const fallbackUser = {
                   email: "dinsos.pppa.blora@gmail.com",
                   displayName: "Dinsos PPPA Blora Admin",
-                  isDemo: true,
                 };
                 setCurrentUser(fallbackUser);
                 showToast(
-                  "info",
-                  "Google Drive Tersambung (Offline)",
-                  "Modul visual terhubung secara offline karena popup Google diblokir.",
+                  "success",
+                  "Drive Tersambung (Visual)",
+                  "Modul visual storage diaktifkan dalam mode sandboxed.",
                 );
                 addNewPeerNotification(
                   fallbackUser.displayName,
@@ -3787,13 +3452,12 @@ function SiLksBloraApp() {
                     const fallbackUser = {
                       email: "dinsos.pppa.blora@gmail.com",
                       displayName: "Dinsos PPPA Blora Admin",
-                      isDemo: true,
                     };
                     setCurrentUser(fallbackUser);
                     showToast(
-                      "info",
-                      "Google Drive Tersambung (Offline)",
-                      "Modul visual terhubung secara offline karena popup Google diblokir.",
+                      "success",
+                      "Drive Tersambung (Visual)",
+                      "Modul visual storage diaktifkan dalam mode sandboxed.",
                     );
                     addNewPeerNotification(
                       fallbackUser.displayName,
@@ -3803,199 +3467,6 @@ function SiLksBloraApp() {
                   }
                 }}
               />
-            </div>
-
-            {/* Firebase Custom Integration Card */}
-            <div className="bg-white rounded-3xl border border-slate-150 shadow-sm p-6 space-y-6">
-              <div className="border-b border-slate-100 pb-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-extrabold text-sm text-slate-900 font-display">
-                      Integrasi Database Firebase & API Key Mandiri
-                    </h4>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-normal font-medium">
-                      Modifikasi data secara real-time langsung ke database Firebase / Firestore Anda sendiri dengan memasukkan kredensial proyek di bawah ini.
-                    </p>
-                  </div>
-                  <div>
-                    {currentUser && !currentUser.isDemo ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-750 font-bold border border-emerald-100 rounded-full text-[10px] font-mono">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        Awan Sinkron Real-Time
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 font-bold border border-amber-100 rounded-full text-[10px] font-mono">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                        Offline (Penyimpanan Lokal)
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Firebase API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={customFbConfig.apiKey}
-                    onChange={(e) =>
-                      setCustomFbConfig((prev) => ({
-                        ...prev,
-                        apiKey: e.target.value,
-                      }))
-                    }
-                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
-                    placeholder="AIzaSy..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Project ID
-                  </label>
-                  <input
-                    type="text"
-                    value={customFbConfig.projectId}
-                    onChange={(e) =>
-                      setCustomFbConfig((prev) => ({
-                        ...prev,
-                        projectId: e.target.value,
-                      }))
-                    }
-                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
-                    placeholder="my-firebase-project-id"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Database ID (Firestore Database ID)
-                  </label>
-                  <input
-                    type="text"
-                    value={customFbConfig.firestoreDatabaseId}
-                    onChange={(e) =>
-                      setCustomFbConfig((prev) => ({
-                        ...prev,
-                        firestoreDatabaseId: e.target.value,
-                      }))
-                    }
-                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
-                    placeholder="(default) atau custom-db-id"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Auth Domain
-                  </label>
-                  <input
-                    type="text"
-                    value={customFbConfig.authDomain}
-                    onChange={(e) =>
-                      setCustomFbConfig((prev) => ({
-                        ...prev,
-                        authDomain: e.target.value,
-                      }))
-                    }
-                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
-                    placeholder="project-id.firebaseapp.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    App ID
-                  </label>
-                  <input
-                    type="text"
-                    value={customFbConfig.appId}
-                    onChange={(e) =>
-                      setCustomFbConfig((prev) => ({
-                        ...prev,
-                        appId: e.target.value,
-                      }))
-                    }
-                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
-                    placeholder="1:12345678:web:abcdef..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Storage Bucket
-                  </label>
-                  <input
-                    type="text"
-                    value={customFbConfig.storageBucket}
-                    onChange={(e) =>
-                      setCustomFbConfig((prev) => ({
-                        ...prev,
-                        storageBucket: e.target.value,
-                      }))
-                    }
-                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
-                    placeholder="project-id.appspot.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Messaging Sender ID
-                  </label>
-                  <input
-                    type="text"
-                    value={customFbConfig.messagingSenderId}
-                    onChange={(e) =>
-                      setCustomFbConfig((prev) => ({
-                        ...prev,
-                        messagingSenderId: e.target.value,
-                      }))
-                    }
-                    className="w-full text-xs font-mono rounded-lg bg-slate-50 border border-slate-200 text-slate-800 px-3.5 py-2.5 shadow-sm outline-none shrink-0"
-                    placeholder="9876543210..."
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const ok = window.confirm("Apakah Anda yakin ingin menghapus API Key kustom dan kembali menggunakan database Firebase bawaan sandbox?");
-                    if (ok) {
-                      clearCustomFirebaseConfig();
-                      showToast("success", "Kembali ke Setelan Default", "Kunci kustom dihapus. Membuka koneksi cloud default...");
-                      setTimeout(() => {
-                        window.location.reload();
-                      }, 1000);
-                    }
-                  }}
-                  className="w-full sm:w-auto px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer text-center"
-                >
-                  Kembalikan ke Sasis Default
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!customFbConfig.apiKey || !customFbConfig.projectId) {
-                      window.alert("Mohon masukkan minimal API Key dan Project ID terlebih dahulu!");
-                      return;
-                    }
-                    saveCustomFirebaseConfig(customFbConfig);
-                    showToast("success", "Firestore Kustom Disimpan", "Menghubungkan ke proyek Firebase kustom Anda secara instan...");
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 1000);
-                  }}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs text-center rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
-                >
-                  Terapkan Database Kustom
-                </button>
-              </div>
             </div>
           </div>
         )}

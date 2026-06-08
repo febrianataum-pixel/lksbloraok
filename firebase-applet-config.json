@@ -3,8 +3,7 @@
   "appId": "1:1000525825418:web:0e40e15d9eaa30327a7473",
   "apiKey": "AIzaSyBFKa8PhNTl2mj4oTuUFfY51aaAKB_ektM",
   "authDomain": "lksdinsos.firebaseapp.com",
-  "databaseURL": "https://lksdinsos-default-rtdb.asia-southeast1.firebasedatabase.app",
-  "firestoreDatabaseId": "ai-studio-7f777e67-47a2-4f4e-9ed4-f4a501a8a999",
+  "firestoreDatabaseId": "(default)",
   "storageBucket": "lksdinsos.firebasestorage.app",
   "messagingSenderId": "1000525825418",
   "measurementId": "G-HNP4GE9PH3"
