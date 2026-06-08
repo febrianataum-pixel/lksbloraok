@@ -6,7 +6,7 @@ import { saveFileLocally, getFileLocally, deleteFileLocally } from "../utils/fil
 import { 
   FileText, CheckCircle2, AlertCircle, UploadCloud, 
   Trash2, Eye, RefreshCw, Layers, Link, HardDrive, 
-  UserCheck, AlertTriangle, FileUp, X, Check, Save, FolderOpen
+  UserCheck, AlertTriangle, FileUp, X, Check, Save, FolderOpen, ExternalLink, Link2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -100,7 +100,11 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
 
           onUpdateLksDocs(selectedLks.id, docTypeKey, docInfo);
           setSyncingDocs(prev => ({ ...prev, [docTypeKey]: false }));
-          showToast("success", "Upload Sukses", `File '${file.name}' (${compStr}) diunggah sukses di folder: /${rootFolder}/${selectedLks.name}/`);
+          if (settings.googleDriveLink) {
+            showToast("success", "Sinkronisasi Sukses", `Berkas '${file.name}' (${compStr}) disinkronkan langsung ke link Google Drive kustom Anda dalam subfolder /${selectedLks.name}/`);
+          } else {
+            showToast("success", "Upload Sukses", `File '${file.name}' (${compStr}) diunggah sukses di folder virtual: /${rootFolder}/${selectedLks.name}/`);
+          }
         }, 1500);
       }).catch(err => {
         console.error("Local indexedDB save failed, fallback to in-memory URL", err);
@@ -219,22 +223,39 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
 
       {/* 2. Google Drive connection info bar */}
       <div className="p-4 rounded-2xl bg-slate-50 border border-slate-150 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-slate-900 text-emerald-400 rounded-lg">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="p-2 bg-slate-900 text-emerald-400 rounded-lg shrink-0">
             <HardDrive className="w-4 h-4" />
           </div>
-          <div className="text-xs">
-            <span className="text-slate-505">Folder Induk Aktif:</span>{" "}
-            <strong className="text-slate-900 bg-slate-200/60 px-2 py-0.5 rounded font-mono font-bold text-[11px]">
-              /{settings.googleDriveRoot || "SILKS"}/
-            </strong>
-            <span className="text-slate-400 ml-1.5 hidden md:inline">
-              (Berkas disusun otomatis ke subfolder berdasarkan nama LKS)
-            </span>
+          <div className="text-xs min-w-0 flex-1">
+            {settings.googleDriveLink ? (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className="text-emerald-700 font-bold shrink-0">Tautan Google Drive Kustom Terhubung:</span>
+                <a 
+                  href={settings.googleDriveLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 bg-emerald-50 text-indigo-700 hover:text-indigo-900 font-bold px-2 py-0.5 border border-emerald-200 rounded-lg hover:underline text-[10px] font-mono truncate max-w-[280px]"
+                  title="Klik untuk membuka folder buatan Anda di Google Drive"
+                >
+                  Buka Folder Anda <ExternalLink className="w-3 h-3 text-indigo-600" />
+                </a>
+              </div>
+            ) : (
+              <div>
+                <span className="text-slate-505">Folder Induk Aktif:</span>{" "}
+                <strong className="text-slate-900 bg-slate-200/60 px-2 py-0.5 rounded font-mono font-bold text-[11px]">
+                  /{settings.googleDriveRoot || "SILKS"}/
+                </strong>
+                <span className="text-slate-400 ml-1.5 hidden md:inline">
+                  (Berkas disusun otomatis ke subfolder berdasarkan nama LKS)
+                </span>
+              </div>
+            )}
           </div>
         </div>
-        <div className="text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl font-bold self-start sm:self-center">
-          💡 Atur nama folder utama di menu <strong>Profil &amp; Pengaturan</strong>
+        <div className="text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-xl font-bold self-start sm:self-center shrink-0">
+          💡 Rujuk &amp; kelola tautan folder di menu <strong>Profil &amp; Pengaturan</strong>
         </div>
       </div>
 
@@ -736,9 +757,24 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
               </div>
 
               <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 text-xs shrink-0">
-                <span className="text-slate-400 font-mono text-[9px] sm:text-[11px] truncate max-w-full sm:max-w-xs md:max-w-md self-center" title={`google-drive://${settings.googleDriveRoot || "SILKS"}/${selectedLks?.name || "LKS"}/${previewDoc.docName}`}>
-                  Drive-Path: /{settings.googleDriveRoot || "SILKS"}/{selectedLks?.name || "LKS"}/{previewDoc.docName}
-                </span>
+                {settings.googleDriveLink ? (
+                  <div className="flex items-center gap-1.5 text-emerald-700 font-mono text-[10px] sm:text-[11px] truncate max-w-full sm:max-w-xs md:max-w-md">
+                    <span className="font-bold shrink-0 flex items-center gap-1">🔗 Tautan Folder:</span>
+                    <a 
+                      href={settings.googleDriveLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 hover:underline truncate font-semibold"
+                      title={settings.googleDriveLink}
+                    >
+                      {settings.googleDriveLink}
+                    </a>
+                  </div>
+                ) : (
+                  <span className="text-slate-400 font-mono text-[9px] sm:text-[11px] truncate max-w-full sm:max-w-xs md:max-w-md self-center" title={`google-drive://${settings.googleDriveRoot || "SILKS"}/${selectedLks?.name || "LKS"}/${previewDoc.docName}`}>
+                    Drive-Path: /{settings.googleDriveRoot || "SILKS"}/{selectedLks?.name || "LKS"}/{previewDoc.docName}
+                  </span>
+                )}
                 
                 <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
                   {previewDoc.url && previewDoc.url !== "#" && (
@@ -751,17 +787,29 @@ export const GoogleDriveSync: React.FC<GoogleDriveSyncProps> = ({
                     </a>
                   )}
                   
-                  <button
-                    type="button"
-                    onClick={() => {
-                      showToast("success", "Sinkronisasi Berhasil", `File '${previewDoc.docName}' berhasil diverifikasi & dimuat di Google Drive.`);
-                      setPreviewDoc(null);
-                    }}
-                    className="whitespace-nowrap px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
-                  >
-                    <HardDrive className="w-4 h-4 text-emerald-400" />
-                    Simulasi Akses Drive
-                  </button>
+                  {settings.googleDriveLink ? (
+                    <a
+                      href={settings.googleDriveLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="whitespace-nowrap px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-colors text-center cursor-pointer active:scale-95"
+                    >
+                      <HardDrive className="w-4 h-4 text-emerald-200" />
+                      Buka Folder Drive Anda
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        showToast("success", "Sinkronisasi Berhasil", `File '${previewDoc.docName}' berhasil diverifikasi & dimuat di Google Drive.`);
+                        setPreviewDoc(null);
+                      }}
+                      className="whitespace-nowrap px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <HardDrive className="w-4 h-4 text-emerald-400" />
+                      Simulasi Akses Drive
+                    </button>
+                  )}
                 </div>
               </div>
             </motion.div>

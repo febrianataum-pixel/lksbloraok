@@ -92,6 +92,7 @@ export interface DinsosSettings {
   appLogo: string;
   managementProfile: string;
   googleDriveRoot?: string;
+  googleDriveLink?: string;
 }
 
 export interface DistrictCoord {
