@@ -1,31 +1,57 @@
 import React from "react";
 import { LKS, Beneficiary, DinsosSettings } from "../types";
 import { calculateAge } from "../utils/exporters";
+import { exportLksTableToPdf, exportBeneficiariesTableToPdf } from "../utils/pdfExport";
 import { Printer, X, Download, FileText } from "lucide-react";
 
 interface PrintPreviewProps {
-  type: "profile" | "recommendation" | "beneficiary-list" | null;
+  type: "profile" | "recommendation" | "beneficiary-list" | "lks-table" | null;
   targetLks: LKS | null;
+  allLks?: LKS[];
   beneficiaries?: Beneficiary[];
   settings: DinsosSettings;
   recommendationNo?: string;
   recommendationTo?: string;
+  reportTitle?: string;
+  filterLabel?: string;
   onClose: () => void;
 }
 
 export const PrintPreview: React.FC<PrintPreviewProps> = ({
   type,
   targetLks,
+  allLks = [],
   beneficiaries = [],
   settings,
   recommendationNo = "050/123/REC/2026",
   recommendationTo = "Pimpinan Lembaga Kesejahteraan Jawa Tengah",
+  reportTitle,
+  filterLabel,
   onClose
 }) => {
   if (!type) return null;
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = () => {
+    if (type === "lks-table") {
+      const listToExport = allLks.length > 0 ? allLks : (targetLks ? [targetLks] : []);
+      exportLksTableToPdf(listToExport, settings, {
+        reportTitle: reportTitle || "DAFTAR REKAPITULASI SELURUH LEMBAGA KESEJAHTERAAN SOSIAL (LKS)",
+        filterLabel
+      });
+    } else if (type === "beneficiary-list") {
+      exportBeneficiariesTableToPdf(beneficiaries, settings, {
+        reportTitle: reportTitle || (targetLks ? `LAMPIRAN DAFTAR PENERIMA MANFAAT (PM) — ${targetLks.name.toUpperCase()}` : "DAFTAR REKAPITULASI SELURUH PENERIMA MANFAAT (PM) LKS"),
+        filterLabel,
+        targetLksName: targetLks?.name,
+        targetLksDistrict: targetLks?.district,
+        targetLksChairman: targetLks?.chairman,
+        filename: targetLks ? `Daftar_PM_${targetLks.name.replace(/\s+/g, '_')}.pdf` : "Daftar_Seluruh_Penerima_Manfaat_Blora.pdf"
+      });
+    }
   };
 
   const getTodayDateFormatted = () => {
@@ -45,28 +71,50 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
     }).format(val);
   };
 
+  const isLandscape = type === "lks-table" || (type === "beneficiary-list" && !targetLks);
+  const displayLksList = allLks.length > 0 ? allLks : (targetLks ? [targetLks] : []);
+
+  const totalActive = displayLksList.filter(l => l.isActive).length;
+  const totalNonActive = displayLksList.length - totalActive;
+  const totalAccredited = displayLksList.filter(l => l.accreditation && l.accreditation !== "Belum terakreditasi").length;
+
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto no-print">
-      <div className="bg-slate-800 text-white p-4 rounded-t-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto no-print">
+      <div className={`bg-slate-800 text-white p-4 rounded-2xl w-full ${isLandscape ? "max-w-6xl" : "max-w-4xl"} max-h-[92vh] flex flex-col shadow-2xl transition-all`}>
         {/* Toolbar Controls */}
-        <div className="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700 pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-emerald-400" />
+            <FileText className="w-5 h-5 text-emerald-400 shrink-0" />
             <div>
-              <h3 className="font-semibold text-slate-100 font-display">
+              <h3 className="font-semibold text-slate-100 font-display text-sm sm:text-base">
                 {type === "profile" && "Cetak Profil LKS (F4)"}
                 {type === "recommendation" && "Cetak Surat Rekomendasi"}
-                {type === "beneficiary-list" && "Cetak Daftar Penerima Manfaat"}
+                {type === "beneficiary-list" && (targetLks ? `Cetak Daftar Penerima Manfaat - ${targetLks.name}` : "Rekapitulasi Seluruh Penerima Manfaat (PDF)")}
+                {type === "lks-table" && "Rekapitulasi Data Seluruh LKS (PDF)"}
               </h3>
               <p className="text-xs text-slate-400">
-                Gunakan pengaturan browser cetak "Simpan ke PDF" dengan ukuran halaman Folio/F4 atau Legal.
+                {type === "lks-table"
+                  ? `Menampilkan ${displayLksList.length} data LKS. Klik "Unduh PDF" untuk berkas instan atau "Cetak / Simpan PDF" via browser.`
+                  : type === "beneficiary-list"
+                  ? `Menampilkan ${beneficiaries.length} data penerima manfaat. Klik "Unduh PDF" untuk berkas instan atau "Cetak / Simpan PDF" via browser.`
+                  : 'Gunakan pengaturan browser cetak "Simpan ke PDF" dengan ukuran halaman Folio/F4 atau Legal.'}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {(type === "lks-table" || type === "beneficiary-list") && (
+              <button
+                onClick={handleDownloadPdf}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-xs font-semibold text-white shadow-md transition-all active:scale-95 cursor-pointer"
+                title="Download langsung berkas PDF resmi"
+              >
+                <Download className="w-4 h-4" />
+                Unduh PDF (.pdf)
+              </button>
+            )}
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold text-white shadow-md transition-all active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-semibold text-white shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               Cetak / Simpan PDF
@@ -81,8 +129,8 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
         </div>
 
         {/* Paper Container */}
-        <div className="flex-1 overflow-y-auto bg-slate-700 p-6 flex justify-center rounded-xl">
-          <div className="bg-white text-slate-800 p-12 w-[100%] max-w-[215mm] border border-slate-200 shadow-xl overflow-hidden font-sans relative" style={{ minHeight: "297mm" }}>
+        <div className="flex-1 overflow-y-auto bg-slate-700 p-2 sm:p-6 flex justify-center rounded-xl">
+          <div className={`bg-white text-slate-800 p-6 sm:p-10 w-full ${isLandscape ? "max-w-[340mm]" : "max-w-[215mm]"} border border-slate-200 shadow-xl overflow-x-auto font-sans relative`} style={{ minHeight: "297mm" }}>
             
             {/* 1. LKS Profile Report (F4) */}
             {type === "profile" && targetLks && (
@@ -364,6 +412,330 @@ export const PrintPreview: React.FC<PrintPreviewProps> = ({
                     <div className="h-16"></div>
                     <p className="font-bold underline">{settings.headOfDinsos}</p>
                     <p className="font-mono text-[10px] text-slate-500">NIP. {settings.nipOfDinsos}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3b. Rekapitulasi Seluruh Penerima Manfaat (Landscape) */}
+            {type === "beneficiary-list" && !targetLks && (
+              <div className="print-landscape-page text-xs leading-relaxed" id="printable-area">
+                {/* Official Kop Surat */}
+                <div className="flex items-center justify-center gap-4 border-b-4 border-double border-slate-800 pb-4 mb-5 text-center">
+                  <div className="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <img src={settings.appLogo} alt="Logo" className="w-full h-full object-cover rounded-lg" referrerPolicy="no-referrer" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold uppercase tracking-wider text-slate-900 leading-tight">Pemerintah Kabupaten Blora</h2>
+                    <h1 className="text-lg font-extrabold uppercase tracking-widest text-slate-900 leading-snug">Dinas Sosial, Pemberdayaan Perempuan<br />dan Perlindungan Anak (Dinsos PPPA)</h1>
+                    <p className="text-[10px] text-slate-500 font-mono italic mt-0.5 font-semibold">Jl. Pemuda No.14 Blora, Jawa Tengah | Kode Pos: 58211 | Telp/Fax: (0296) 531084</p>
+                  </div>
+                </div>
+
+                {/* Title & Stats */}
+                <div className="text-center mb-5">
+                  <h3 className="text-base font-extrabold uppercase tracking-wider text-slate-900">
+                    {reportTitle || "Daftar Rekapitulasi Seluruh Penerima Manfaat (PM) LKS"}
+                  </h3>
+                  <p className="text-xs text-slate-600 font-semibold mt-0.5">
+                    Kabupaten Blora, Provinsi Jawa Tengah — Tahun {new Date().getFullYear()}
+                  </p>
+                  {filterLabel && (
+                    <p className="text-[11px] text-slate-500 italic mt-0.5">
+                      Kategori Filter: {filterLabel}
+                    </p>
+                  )}
+
+                  {/* Summary Badges Bar */}
+                  <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mt-3 pt-2 pb-1 border-y border-slate-200 text-[11px] text-slate-700">
+                    <span className="font-semibold">
+                      Total: <strong className="text-slate-900 font-bold">{beneficiaries.length} Orang</strong>
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-emerald-700 font-semibold">
+                      PM Dalam: <strong>{beneficiaries.filter(b => b.category === "Dalam").length} Orang</strong>
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-purple-700 font-semibold">
+                      PM Luar: <strong>{beneficiaries.filter(b => b.category === "Luar").length} Orang</strong>
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-blue-700 font-semibold">
+                      Laki-laki: <strong>{beneficiaries.filter(b => b.gender === "L").length} Orang</strong>
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-rose-700 font-semibold">
+                      Perempuan: <strong>{beneficiaries.filter(b => b.gender === "P").length} Orang</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Master Table of all PM data */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[10px] border border-slate-300 border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800 text-white font-bold text-center">
+                        <th className="p-2 border border-slate-700 w-8">No.</th>
+                        <th className="p-2 border border-slate-700 min-w-[140px] text-left">Nama Lengkap</th>
+                        <th className="p-2 border border-slate-700 min-w-[110px] text-left">NIK</th>
+                        <th className="p-2 border border-slate-700 w-12">L/P</th>
+                        <th className="p-2 border border-slate-700 w-14">Usia</th>
+                        <th className="p-2 border border-slate-700 min-w-[140px] text-left">Asal Lembaga LKS</th>
+                        <th className="p-2 border border-slate-700 min-w-[130px] text-left">Domisili Kecamatan (Desa)</th>
+                        <th className="p-2 border border-slate-700 w-20">Kategori</th>
+                        <th className="p-2 border border-slate-700 min-w-[130px] text-left">Keterangan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {beneficiaries.length > 0 ? (
+                        beneficiaries.map((pm, idx) => (
+                          <tr
+                            key={pm.id}
+                            className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${
+                              idx % 2 === 1 ? "bg-slate-50/60" : "bg-white"
+                            }`}
+                          >
+                            <td className="p-2 font-mono text-center font-bold border-r border-slate-200">
+                              {idx + 1}
+                            </td>
+                            <td className="p-2 font-bold text-slate-900 border-r border-slate-200">
+                              {pm.name}
+                            </td>
+                            <td className="p-2 font-mono text-[9px] text-slate-700 border-r border-slate-200">
+                              {pm.nik}
+                            </td>
+                            <td className="p-2 text-center border-r border-slate-200">
+                              {pm.gender === "L" ? "L" : "P"}
+                            </td>
+                            <td className="p-2 font-mono text-center border-r border-slate-200">
+                              {calculateAge(pm.birthDate) ? `${calculateAge(pm.birthDate)} Th` : "-"}
+                            </td>
+                            <td className="p-2 font-semibold text-slate-800 border-r border-slate-200">
+                              {pm.lksName || "-"}
+                            </td>
+                            <td className="p-2 text-slate-700 border-r border-slate-200">
+                              {pm.district} ({pm.village})
+                            </td>
+                            <td className="p-2 text-center border-r border-slate-200">
+                              <span
+                                className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                  pm.category === "Dalam"
+                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                    : "bg-purple-100 text-purple-800 border border-purple-200"
+                                }`}
+                              >
+                                {pm.category === "Dalam" ? "PM DALAM" : "PM LUAR"}
+                              </span>
+                            </td>
+                            <td className="p-2 text-slate-600">
+                              {pm.notes || "-"}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={9} className="p-6 text-center italic text-slate-400">
+                            Tidak ada data penerima manfaat yang terdaftar.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Sign Board Pengesahan Resmi */}
+                <div className="mt-8 flex justify-end items-start text-xs border-t border-slate-200 pt-6">
+                  <div className="w-80 text-right">
+                    <p className="text-slate-600">Blora, {getTodayDateFormatted()}</p>
+                    <p className="font-bold text-slate-900 mt-1">
+                      Kepala Dinas Sosial, Pemberdayaan Perempuan<br />dan Perlindungan Anak Kab. Blora
+                    </p>
+                    <div className="h-16"></div>
+                    <p className="font-bold underline text-slate-900">
+                      {settings.headOfDinsos || "Drs. Luluk Kusuma Agung Ariadi, AP"}
+                    </p>
+                    <p className="font-mono text-[10px] text-slate-500 font-semibold mt-0.5">
+                      NIP. {settings.nipOfDinsos || "19740112 199311 1 001"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. Rekapitulasi Tabel Seluruh Data LKS (Landscape F4 / Legal) */}
+            {type === "lks-table" && (
+              <div className="print-landscape-page text-xs leading-relaxed" id="printable-area">
+                {/* Official Kop Surat */}
+                <div className="flex items-center justify-center gap-4 border-b-4 border-double border-slate-800 pb-4 mb-5 text-center">
+                  <div className="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <img
+                      src={settings.appLogo}
+                      alt="Logo"
+                      className="w-full h-full object-cover rounded-lg"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold uppercase tracking-wider text-slate-900 leading-tight">
+                      Pemerintah Kabupaten Blora
+                    </h2>
+                    <h1 className="text-lg font-extrabold uppercase tracking-widest text-slate-900 leading-snug">
+                      Dinas Sosial, Pemberdayaan Perempuan<br />dan Perlindungan Anak (Dinsos PPPA)
+                    </h1>
+                    <p className="text-[10px] text-slate-500 font-mono italic mt-0.5 font-semibold">
+                      Jl. Pemuda No.14 Blora, Jawa Tengah | Kode Pos: 58211 | Telp/Fax: (0296) 531084
+                    </p>
+                  </div>
+                </div>
+
+                {/* Title & Stats */}
+                <div className="text-center mb-5">
+                  <h3 className="text-base font-extrabold uppercase tracking-wider text-slate-900">
+                    {reportTitle || "Daftar Rekapitulasi Seluruh Lembaga Kesejahteraan Sosial (LKS)"}
+                  </h3>
+                  <p className="text-xs text-slate-600 font-semibold mt-0.5">
+                    Kabupaten Blora, Provinsi Jawa Tengah — Tahun {new Date().getFullYear()}
+                  </p>
+                  {filterLabel && (
+                    <p className="text-[11px] text-slate-500 italic mt-0.5">
+                      Kategori Filter: {filterLabel}
+                    </p>
+                  )}
+
+                  {/* Summary Badges Bar */}
+                  <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mt-3 pt-2 pb-1 border-y border-slate-200 text-[11px] text-slate-700">
+                    <span className="font-semibold">
+                      Total: <strong className="text-slate-900 font-bold">{displayLksList.length} Lembaga</strong>
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-emerald-700 font-semibold">
+                      Aktif: <strong>{totalActive} LKS</strong>
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-rose-700 font-semibold">
+                      Non-Aktif: <strong>{totalNonActive} LKS</strong>
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-indigo-700 font-semibold">
+                      Terakreditasi: <strong>{totalAccredited} LKS</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Master Table of all LKS data */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[10px] border border-slate-300 border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800 text-white font-bold text-center">
+                        <th className="p-2 border border-slate-700 w-8">No.</th>
+                        <th className="p-2 border border-slate-700 min-w-[130px] text-left">Nama LKS &amp; ID</th>
+                        <th className="p-2 border border-slate-700 min-w-[90px] text-left">Kecamatan</th>
+                        <th className="p-2 border border-slate-700 min-w-[90px] text-left">Desa/Kel.</th>
+                        <th className="p-2 border border-slate-700 min-w-[130px] text-left">Alamat Lengkap</th>
+                        <th className="p-2 border border-slate-700 min-w-[120px] text-left">Ketua &amp; WhatsApp</th>
+                        <th className="p-2 border border-slate-700 min-w-[110px] text-left">SK Kemenkumham</th>
+                        <th className="p-2 border border-slate-700 min-w-[110px] text-left">No. STD &amp; Masa Berlaku</th>
+                        <th className="p-2 border border-slate-700 min-w-[90px]">Akreditasi</th>
+                        <th className="p-2 border border-slate-700 w-16">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayLksList.length > 0 ? (
+                        displayLksList.map((lks, idx) => (
+                          <tr
+                            key={lks.id}
+                            className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${
+                              idx % 2 === 1 ? "bg-slate-50/60" : "bg-white"
+                            }`}
+                          >
+                            <td className="p-2 font-mono text-center font-bold border-r border-slate-200">
+                              {idx + 1}
+                            </td>
+                            <td className="p-2 font-bold text-slate-900 border-r border-slate-200">
+                              <div>{lks.name}</div>
+                              <div className="text-[9px] font-mono text-slate-400 font-normal">
+                                ID: {lks.id}
+                                {lks.establishedDate && ` | Berdiri: ${lks.establishedDate}`}
+                              </div>
+                            </td>
+                            <td className="p-2 font-semibold text-slate-800 border-r border-slate-200">
+                              {lks.district || "-"}
+                            </td>
+                            <td className="p-2 text-slate-700 border-r border-slate-200">
+                              {lks.village || "-"}
+                            </td>
+                            <td className="p-2 text-slate-600 border-r border-slate-200 leading-snug">
+                              {lks.address || "-"}
+                            </td>
+                            <td className="p-2 border-r border-slate-200">
+                              <div className="font-semibold text-slate-800">{lks.chairman || "-"}</div>
+                              {lks.whatsapp && (
+                                <div className="font-mono text-[9px] text-emerald-700">
+                                  WA: {lks.whatsapp}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-2 font-mono text-[9px] text-slate-700 border-r border-slate-200">
+                              {lks.kemenkumhamNo || "-"}
+                            </td>
+                            <td className="p-2 font-mono text-[9px] text-slate-700 border-r border-slate-200">
+                              <div>{lks.stdNo || "-"}</div>
+                              {lks.stdExpiryDate && (
+                                <div className="text-[8px] text-slate-400">
+                                  s/d: {lks.stdExpiryDate}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-2 text-center border-r border-slate-200">
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                                  lks.accreditation && lks.accreditation !== "Belum terakreditasi"
+                                    ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                    : "text-slate-500"
+                                }`}
+                              >
+                                {lks.accreditation || "Belum"}
+                                {lks.accreditationYear ? ` (${lks.accreditationYear})` : ""}
+                              </span>
+                            </td>
+                            <td className="p-2 text-center">
+                              <span
+                                className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                  lks.isActive
+                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                    : "bg-rose-100 text-rose-800 border border-rose-200"
+                                }`}
+                              >
+                                {lks.isActive ? "AKTIF" : "NON-AKTIF"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={10} className="p-6 text-center italic text-slate-400">
+                            Tidak ada data Lembaga Kesejahteraan Sosial (LKS) yang terdaftar.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Sign Board Pengesahan Resmi */}
+                <div className="mt-8 flex justify-end items-start text-xs border-t border-slate-200 pt-6">
+                  <div className="w-80 text-right">
+                    <p className="text-slate-600">Blora, {getTodayDateFormatted()}</p>
+                    <p className="font-bold text-slate-900 mt-1">
+                      Kepala Dinas Sosial, Pemberdayaan Perempuan<br />dan Perlindungan Anak Kab. Blora
+                    </p>
+                    <div className="h-16"></div>
+                    <p className="font-bold underline text-slate-900">
+                      {settings.headOfDinsos || "Drs. Luluk Kusuma Agung Ariadi, AP"}
+                    </p>
+                    <p className="font-mono text-[10px] text-slate-500 font-semibold mt-0.5">
+                      NIP. {settings.nipOfDinsos || "19740112 199311 1 001"}
+                    </p>
                   </div>
                 </div>
               </div>

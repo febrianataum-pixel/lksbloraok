@@ -23,6 +23,7 @@ import GoogleDriveSync from "./components/GoogleDriveSync";
 import GoogleDriveFolderConfig from "./components/GoogleDriveFolderConfig";
 import PrintPreview from "./components/PrintPreview";
 import { calculateAge, exportToCsv, parseCsvText } from "./utils/exporters";
+import { exportLksTableToPdf, exportBeneficiariesTableToPdf } from "./utils/pdfExport";
 
 // Recharts for interactive dashboards
 import {
@@ -84,6 +85,9 @@ import {
   X,
   Menu,
   UserMinus,
+  ChevronDown,
+  Download,
+  FileText,
 } from "lucide-react";
 
 export default function App() {
@@ -205,10 +209,41 @@ function SiLksBloraApp() {
 
   // Interactive Printing overlays
   const [printDocument, setPrintDocument] = useState<{
-    type: "profile" | "recommendation" | "beneficiary-list";
-    targetLks: LKS;
+    type: "profile" | "recommendation" | "beneficiary-list" | "lks-table";
+    targetLks?: LKS | null;
+    allLks?: LKS[];
     beneficiaries?: Beneficiary[];
+    reportTitle?: string;
+    filterLabel?: string;
   } | null>(null);
+
+  // Export PDF dropdown toggle for Data LKS
+  const [showLksPdfExportDropdown, setShowLksPdfExportDropdown] = useState(false);
+  const pdfExportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Export PDF dropdown toggle for Penerima Manfaat
+  const [showPmPdfExportDropdown, setShowPmPdfExportDropdown] = useState(false);
+  const pmPdfExportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close PDF dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        pdfExportDropdownRef.current &&
+        !pdfExportDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowLksPdfExportDropdown(false);
+      }
+      if (
+        pmPdfExportDropdownRef.current &&
+        !pmPdfExportDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowPmPdfExportDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Search filter for LKS page
   const [searchLksQuery, setSearchLksQuery] = useState("");
@@ -768,6 +803,55 @@ function SiLksBloraApp() {
     );
   };
 
+  // LKS Exports (PDF) - Export table of all LKS data
+  const handleExportLksPdf = (
+    scope: "all" | "filtered" | "selected",
+    mode: "download" | "preview"
+  ) => {
+    setShowLksPdfExportDropdown(false);
+    let targetList: LKS[] = lksList;
+    let label: string | undefined = undefined;
+
+    if (scope === "selected" && selectedLksIds.length > 0) {
+      targetList = lksList.filter((l) => selectedLksIds.includes(l.id));
+      label = `${targetList.length} LKS Terpilih`;
+    } else if (scope === "filtered" && searchLksQuery.trim()) {
+      targetList = filteredLksList;
+      label = `Hasil Pencarian "${searchLksQuery}" (${targetList.length} LKS)`;
+    }
+
+    if (targetList.length === 0) {
+      showToast("warning", "Data Kosong", "Tidak ada data LKS untuk diexport ke PDF.");
+      return;
+    }
+
+    if (mode === "download") {
+      try {
+        exportLksTableToPdf(targetList, settings, {
+          filename: `Daftar_Seluruh_Data_LKS_Blora_${scope === "all" ? "Lengkap" : scope}.pdf`,
+          reportTitle: "DAFTAR REKAPITULASI SELURUH LEMBAGA KESEJAHTERAAN SOSIAL (LKS)",
+          filterLabel: label,
+        });
+        showToast(
+          "success",
+          "PDF Berhasil Diunduh",
+          `Tabel data LKS (${targetList.length} lembaga) berhasil diexport ke file PDF resmi.`
+        );
+      } catch (err) {
+        console.error("Export PDF error:", err);
+        showToast("error", "Gagal Export PDF", "Terjadi kesalahan saat memproses berkas PDF.");
+      }
+    } else {
+      setPrintDocument({
+        type: "lks-table",
+        allLks: targetList,
+        targetLks: null,
+        reportTitle: "DAFTAR REKAPITULASI SELURUH LEMBAGA KESEJAHTERAAN SOSIAL (LKS)",
+        filterLabel: label,
+      });
+    }
+  };
+
   // LKS CSV Import Parser
   const handleImportLksCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1137,6 +1221,85 @@ function SiLksBloraApp() {
     );
   };
 
+  // Beneficiary Exports (PDF) - Export table of Beneficiaries
+  const handleExportPmPdf = (
+    scope: "all" | "filtered" | "lks",
+    mode: "download" | "preview",
+    targetLksId?: string
+  ) => {
+    setShowPmPdfExportDropdown(false);
+    let targetList: Beneficiary[] = beneficiaries;
+    let label: string | undefined = undefined;
+    let targetLksObj: LKS | null = null;
+
+    if (scope === "lks" && targetLksId) {
+      targetLksObj = lksList.find((l) => l.id === targetLksId) || null;
+      targetList = beneficiaries.filter((pm) => pm.lksId === targetLksId);
+      label = targetLksObj ? `LKS ${targetLksObj.name}` : undefined;
+    } else if (scope === "filtered" && searchBenefitSumQuery.trim()) {
+      const q = searchBenefitSumQuery.toLowerCase();
+      const matchingLksIds = lksList
+        .filter(
+          (l) =>
+            l.name.toLowerCase().includes(q) ||
+            l.district.toLowerCase().includes(q)
+        )
+        .map((l) => l.id);
+      targetList = beneficiaries.filter(
+        (pm) =>
+          matchingLksIds.includes(pm.lksId) ||
+          pm.name.toLowerCase().includes(q) ||
+          pm.nik.includes(q) ||
+          pm.district.toLowerCase().includes(q)
+      );
+      label = `Hasil Pencarian "${searchBenefitSumQuery}" (${targetList.length} PM)`;
+    }
+
+    if (targetList.length === 0) {
+      showToast(
+        "warning",
+        "Data Kosong",
+        "Tidak ada data penerima manfaat untuk diexport ke PDF."
+      );
+      return;
+    }
+
+    if (mode === "download") {
+      try {
+        exportBeneficiariesTableToPdf(targetList, settings, {
+          filename: targetLksObj
+            ? `Daftar_PM_${targetLksObj.name.replace(/\s+/g, "_")}.pdf`
+            : `Daftar_Seluruh_Penerima_Manfaat_Blora_${scope === "all" ? "Lengkap" : scope}.pdf`,
+          reportTitle: targetLksObj
+            ? `LAMPIRAN DAFTAR PENERIMA MANFAAT (PM) — ${targetLksObj.name.toUpperCase()}`
+            : "DAFTAR REKAPITULASI SELURUH PENERIMA MANFAAT (PM) LKS",
+          filterLabel: label,
+          targetLksName: targetLksObj?.name,
+          targetLksDistrict: targetLksObj?.district,
+          targetLksChairman: targetLksObj?.chairman,
+        });
+        showToast(
+          "success",
+          "PDF Berhasil Diunduh",
+          `Tabel data penerima manfaat (${targetList.length} orang) berhasil diexport ke file PDF resmi.`
+        );
+      } catch (err) {
+        console.error("Export PDF PM error:", err);
+        showToast("error", "Gagal Export PDF", "Terjadi kesalahan saat memproses berkas PDF.");
+      }
+    } else {
+      setPrintDocument({
+        type: "beneficiary-list",
+        targetLks: targetLksObj,
+        beneficiaries: targetList,
+        reportTitle: targetLksObj
+          ? `LAMPIRAN DAFTAR PENERIMA MANFAAT (PM) — ${targetLksObj.name.toUpperCase()}`
+          : "DAFTAR REKAPITULASI SELURUH PENERIMA MANFAAT (PM) LKS",
+        filterLabel: label,
+      });
+    }
+  };
+
   // Beneficiary CSV Import
   const handleImportPmCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1407,25 +1570,13 @@ function SiLksBloraApp() {
       );
       return;
     }
-    // We can show beneficiary print list matching the first available LKS or a mock summary
-    const dummyLksRef: LKS =
-      lksList[0] ||
-      ({
-        id: "all-search",
-        name: "Seluruh LKS Terdaftar",
-        district: "Wilayah Kabupaten Blora",
-        village: "-",
-        address: "Sistem Pencarian Hub SiLKS",
-        chairman: "Pembimbing Dinsos PPPA",
-        establishedDate: "2026-06-05",
-        isActive: true,
-        whatsapp: "",
-      } as any);
 
     setPrintDocument({
       type: "beneficiary-list",
-      targetLks: dummyLksRef,
+      targetLks: null,
       beneficiaries: filteredSearchPms,
+      reportTitle: "DAFTAR REKAPITULASI HASIL PENCARIAN PENERIMA MANFAAT (PM)",
+      filterLabel: `Ditemukan ${filteredSearchPms.length} Penerima Manfaat Terfilter`,
     });
   };
 
@@ -1645,11 +1796,14 @@ function SiLksBloraApp() {
       {printDocument && (
         <PrintPreview
           type={printDocument.type}
-          targetLks={printDocument.targetLks}
+          targetLks={printDocument.targetLks || null}
+          allLks={printDocument.allLks}
           beneficiaries={printDocument.beneficiaries}
           settings={settings}
           recommendationNo={recLetterNo}
           recommendationTo={recLetterTo}
+          reportTitle={printDocument.reportTitle}
+          filterLabel={printDocument.filterLabel}
           onClose={() => setPrintDocument(null)}
         />
       )}
@@ -2199,6 +2353,88 @@ function SiLksBloraApp() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Export to PDF Button with Dropdown Options */}
+                    <div className="relative" ref={pdfExportDropdownRef}>
+                      <div className="inline-flex rounded-lg shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => handleExportLksPdf("all", "download")}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-l-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-xs transition-colors cursor-pointer"
+                          title="Download langsung file PDF seluruh data LKS"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          Export to PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowLksPdfExportDropdown(!showLksPdfExportDropdown)}
+                          className="px-2 py-2 rounded-r-lg bg-red-700 hover:bg-red-800 text-white border-l border-red-500 text-xs transition-colors cursor-pointer"
+                          title="Pilihan opsi export PDF"
+                          aria-label="Pilihan opsi export PDF"
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {showLksPdfExportDropdown && (
+                        <div className="absolute right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30 animate-fade-in text-xs">
+                          <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Opsi Rekapitulasi PDF
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleExportLksPdf("all", "download")}
+                            className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-slate-50 text-slate-700 hover:text-red-700 transition-colors cursor-pointer font-medium"
+                          >
+                            <Download className="w-4 h-4 text-red-600 shrink-0" />
+                            <div>
+                              <div className="font-semibold text-slate-800">Unduh Langsung (.pdf)</div>
+                              <div className="text-[10px] text-slate-400">Seluruh data LKS ({lksList.length} lembaga)</div>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleExportLksPdf("all", "preview")}
+                            className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-slate-50 text-slate-700 hover:text-emerald-700 transition-colors cursor-pointer font-medium"
+                          >
+                            <Printer className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <div>
+                              <div className="font-semibold text-slate-800">Pratinjau &amp; Cetak PDF</div>
+                              <div className="text-[10px] text-slate-400">Format resmi Kop Surat &amp; Tanda Tangan</div>
+                            </div>
+                          </button>
+
+                          {searchLksQuery.trim() && (
+                            <button
+                              type="button"
+                              onClick={() => handleExportLksPdf("filtered", "download")}
+                              className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-slate-50 text-slate-700 hover:text-red-700 transition-colors cursor-pointer font-medium border-t border-slate-100"
+                            >
+                              <Search className="w-4 h-4 text-indigo-600 shrink-0" />
+                              <div>
+                                <div className="font-semibold text-slate-800">Unduh PDF Data Terfilter</div>
+                                <div className="text-[10px] text-slate-400">{filteredLksList.length} lembaga sesuai pencarian</div>
+                              </div>
+                            </button>
+                          )}
+
+                          {selectedLksIds.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleExportLksPdf("selected", "download")}
+                              className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-slate-50 text-slate-700 hover:text-red-700 transition-colors cursor-pointer font-medium border-t border-slate-100"
+                            >
+                              <Check className="w-4 h-4 text-rose-600 shrink-0" />
+                              <div>
+                                <div className="font-semibold text-slate-800">Unduh PDF Data Terpilih</div>
+                                <div className="text-[10px] text-slate-400">{selectedLksIds.length} lembaga yang dicentang</div>
+                              </div>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     <button
                       onClick={handleExportLksExcel}
                       className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors cursor-pointer"
@@ -2246,6 +2482,14 @@ function SiLksBloraApp() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleExportLksPdf("selected", "download")}
+                        className="flex items-center gap-1 px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] rounded-lg shadow-sm cursor-pointer transition-colors"
+                      >
+                        <FileText className="w-3 h-3" />
+                        Export PDF ({selectedLksIds.length})
+                      </button>
                       <button
                         type="button"
                         onClick={() => setSelectedLksIds([])}
@@ -2520,6 +2764,66 @@ function SiLksBloraApp() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Export PDF Menu */}
+                    <div className="relative" ref={pmPdfExportDropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowPmPdfExportDropdown(!showPmPdfExportDropdown)
+                        }
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold text-xs transition-colors cursor-pointer"
+                        title="Export daftar nama-nama Penerima Manfaat ke dokumen PDF resmi"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-red-600" />
+                        Export PDF
+                        <ChevronDown className="w-3 h-3 text-red-500" />
+                      </button>
+
+                      {showPmPdfExportDropdown && (
+                        <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 text-xs animate-in fade-in zoom-in-95 duration-100">
+                          <div className="px-3 py-1.5 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            Pilihan Cetak Penerima Manfaat
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleExportPmPdf("all", "download")}
+                            className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-slate-50 text-slate-700 hover:text-red-700 transition-colors cursor-pointer font-medium"
+                          >
+                            <Download className="w-4 h-4 text-red-600 shrink-0" />
+                            <div>
+                              <div className="font-semibold text-slate-800">Unduh Langsung Seluruh PM (.pdf)</div>
+                              <div className="text-[10px] text-slate-400">Seluruh data PM ({beneficiaries.length} orang)</div>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleExportPmPdf("all", "preview")}
+                            className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-slate-50 text-slate-700 hover:text-emerald-700 transition-colors cursor-pointer font-medium"
+                          >
+                            <Printer className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <div>
+                              <div className="font-semibold text-slate-800">Pratinjau &amp; Cetak PDF</div>
+                              <div className="text-[10px] text-slate-400">Format resmi Kop Surat &amp; Tanda Tangan</div>
+                            </div>
+                          </button>
+
+                          {searchBenefitSumQuery.trim() && (
+                            <button
+                              type="button"
+                              onClick={() => handleExportPmPdf("filtered", "download")}
+                              className="w-full px-3 py-2 text-left flex items-center gap-2.5 hover:bg-slate-50 text-slate-700 hover:text-red-700 transition-colors cursor-pointer font-medium border-t border-slate-100"
+                            >
+                              <Search className="w-4 h-4 text-indigo-600 shrink-0" />
+                              <div>
+                                <div className="font-semibold text-slate-800">Unduh PDF Data Terfilter</div>
+                                <div className="text-[10px] text-slate-400">Sesuai pencarian &quot;{searchBenefitSumQuery}&quot;</div>
+                              </div>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => setShowPmImportHelpModal(true)}
@@ -2643,21 +2947,49 @@ function SiLksBloraApp() {
                                             </p>
                                           </div>
 
-                                          <div className="flex items-center gap-2">
+                                          <div className="flex flex-wrap items-center gap-2">
                                             {selectedPmIdsForBulkDelete.length >
                                               0 && (
-                                              <button
-                                                type="button"
-                                                onClick={handleBulkDeletePm}
-                                                className="flex items-center gap-1 px-3 py-1.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-2xs uppercase transition-colors cursor-pointer"
-                                              >
-                                                <Trash2 className="w-3 h-3" />
-                                                Hapus Terpilih (
-                                                {
-                                                  selectedPmIdsForBulkDelete.length
-                                                }
-                                                )
-                                              </button>
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const selectedList = beneficiaries.filter((pm) =>
+                                                      selectedPmIdsForBulkDelete.includes(pm.id)
+                                                    );
+                                                    const lksObj = lksList.find((l) => l.id === row.lksId);
+                                                    exportBeneficiariesTableToPdf(selectedList, settings, {
+                                                      targetLksName: lksObj?.name,
+                                                      targetLksDistrict: lksObj?.district,
+                                                      targetLksChairman: lksObj?.chairman,
+                                                      filename: `Daftar_PM_Terpilih_${(lksObj?.name || "LKS").replace(/\s+/g, "_")}.pdf`,
+                                                      filterLabel: `${selectedList.length} PM Terpilih`,
+                                                    });
+                                                    showToast(
+                                                      "success",
+                                                      "PDF Diunduh",
+                                                      `${selectedList.length} Penerima Manfaat terpilih berhasil diexport.`
+                                                    );
+                                                  }}
+                                                  className="flex items-center gap-1 px-3 py-1.5 rounded bg-red-50 hover:bg-red-100 text-red-700 font-bold text-2xs uppercase transition-colors cursor-pointer border border-red-200"
+                                                >
+                                                  <FileText className="w-3 h-3 text-red-600" />
+                                                  Export PDF ({selectedPmIdsForBulkDelete.length})
+                                                </button>
+
+                                                <button
+                                                  type="button"
+                                                  onClick={handleBulkDeletePm}
+                                                  className="flex items-center gap-1 px-3 py-1.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-2xs uppercase transition-colors cursor-pointer"
+                                                >
+                                                  <Trash2 className="w-3 h-3" />
+                                                  Hapus Terpilih (
+                                                  {
+                                                    selectedPmIdsForBulkDelete.length
+                                                  }
+                                                  )
+                                                </button>
+                                              </>
                                             )}
 
                                             <button
@@ -2669,6 +3001,22 @@ function SiLksBloraApp() {
                                             >
                                               <FileDown className="w-3.5 h-3.5" />
                                               Export Excel
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleExportPmPdf(
+                                                  "lks",
+                                                  "download",
+                                                  row.lksId,
+                                                )
+                                              }
+                                              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[10.5px] cursor-pointer shadow-sm transition-colors"
+                                              title="Unduh langsung file PDF untuk seluruh penerima manfaat LKS ini"
+                                            >
+                                              <Download className="w-3.5 h-3.5" />
+                                              Export PDF
                                             </button>
 
                                             <button
